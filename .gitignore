@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Entornos virtuales
+venv/
+env/
+.env
+*.env
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+sync.log
+
+# Configuración con datos sensibles o de máquina específica
+cliente/config.ini
+cliente/.pc_id
+
+# Distribución / empaquetado
+dist/
+build/
+*.egg-info/
+*.egg
+*.whl
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini

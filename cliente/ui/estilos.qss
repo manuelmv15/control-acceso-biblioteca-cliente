@@ -1,0 +1,118 @@
+/* ============ Biblioteca Kiosko — Estilos globales ============ */
+
+QWidget {
+    background-color: #1a3c6e;
+    color: #ffffff;
+    font-family: "Segoe UI", "Arial", sans-serif;
+    font-size: 18px;
+}
+
+QLabel#titulo {
+    font-size: 32px;
+    font-weight: bold;
+    color: #f0a500;
+    padding: 8px 0;
+}
+
+QLabel#subtitulo {
+    font-size: 18px;
+    color: rgba(255,255,255,0.75);
+    padding: 4px 0;
+}
+
+QLabel#nombre-estudiante {
+    font-size: 28px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+QLabel#timer {
+    font-size: 48px;
+    font-weight: bold;
+    color: #f0a500;
+    letter-spacing: 4px;
+}
+
+QLabel#info {
+    font-size: 15px;
+    color: rgba(255,255,255,0.65);
+}
+
+QLabel#error {
+    font-size: 15px;
+    color: #ff6b6b;
+    padding: 4px;
+}
+
+QLineEdit {
+    background-color: rgba(255,255,255,0.12);
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 22px;
+    color: #ffffff;
+    selection-background-color: #f0a500;
+}
+
+QLineEdit:focus {
+    border-color: #f0a500;
+    background-color: rgba(255,255,255,0.18);
+}
+
+QPushButton {
+    background-color: #f0a500;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 8px;
+    padding: 14px 32px;
+    font-size: 18px;
+    font-weight: bold;
+    min-width: 160px;
+}
+
+QPushButton:hover { background-color: #e09400; }
+QPushButton:pressed { background-color: #c08000; }
+
+QPushButton#btn-secundario {
+    background-color: rgba(255,255,255,0.15);
+    color: #ffffff;
+    border: 2px solid rgba(255,255,255,0.4);
+}
+
+QPushButton#btn-secundario:hover { background-color: rgba(255,255,255,0.25); }
+
+QPushButton#btn-cerrar-sesion {
+    background-color: #dc3545;
+    color: white;
+    font-size: 20px;
+    padding: 16px 48px;
+}
+
+QPushButton#btn-cerrar-sesion:hover { background-color: #c82333; }
+
+QComboBox {
+    background-color: rgba(255,255,255,0.12);
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 16px;
+    color: white;
+}
+
+QComboBox::drop-down { border: none; width: 30px; }
+QComboBox QAbstractItemView {
+    background-color: #1e4a8a;
+    color: white;
+    selection-background-color: #f0a500;
+    selection-color: #1a1a2e;
+    border: none;
+}
+
+QRadioButton { font-size: 16px; spacing: 8px; }
+QRadioButton::indicator { width: 20px; height: 20px; }
+
+QFrame#separador {
+    background-color: rgba(255,255,255,0.2);
+    max-height: 1px;
+    margin: 8px 0;
+}
