@@ -2,9 +2,11 @@ import uuid
 from datetime import datetime, date
 from pathlib import Path
 
-from PyQt6.QtWidgets import QMainWindow, QStackedWidget, QApplication
-from PyQt6.QtCore import Qt, QKeyCombination
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtWidgets import (
+    QMainWindow, QStackedWidget, QApplication, QSystemTrayIcon, QMenu
+)
+from PyQt6.QtCore import Qt, QTimer, QKeyCombination
+from PyQt6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap, QColor
 
 from ui.login import PantallaLogin
 from ui.registro import PantallaRegistro
@@ -16,6 +18,8 @@ PANTALLA_LOGIN = 0
 PANTALLA_REGISTRO = 1
 PANTALLA_SESION = 2
 
+DURACION_SESION_MS = 60 * 60 * 1000  # 1 hora
+
 SALIDA_SECRETA = QKeySequence(
     QKeyCombination(
         Qt.KeyboardModifier.ControlModifier |
@@ -26,26 +30,27 @@ SALIDA_SECRETA = QKeySequence(
 )
 
 
+def _icono_fallback() -> QIcon:
+    pix = QPixmap(32, 32)
+    pix.fill(QColor("#1a3c6e"))
+    return QIcon(pix)
+
+
 class VentanaKiosko(QMainWindow):
     def __init__(self):
         super().__init__()
         self._sesion_activa_id: str | None = None
         self._sesion_inicio: datetime | None = None
 
-        self._configurar_ventana()
+        self._timer_sesion = QTimer(self)
+        self._timer_sesion.setSingleShot(True)
+        self._timer_sesion.timeout.connect(self._sesion_expirada)
+
         self._cargar_estilos()
         self._construir_ui()
+        self._configurar_tray()
         self._registrar_atajos()
-
-    def _configurar_ventana(self):
-        self.setWindowTitle("Biblioteca")
-        self.showFullScreen()
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.CustomizeWindowHint
-        )
-        self.setWindowState(Qt.WindowState.WindowFullScreen)
+        self._mostrar_login()
 
     def _cargar_estilos(self):
         qss_path = Path(__file__).parent / "estilos.qss"
@@ -70,11 +75,52 @@ class VentanaKiosko(QMainWindow):
         self.registro.cancelar.connect(lambda: self.stack.setCurrentIndex(PANTALLA_LOGIN))
         self.bienvenida.cerrar_sesion.connect(self._on_cerrar_sesion)
 
-        self.stack.setCurrentIndex(PANTALLA_LOGIN)
+    def _configurar_tray(self):
+        logo = Path(__file__).parent.parent / "assets" / "logo.png"
+        icono = QIcon(str(logo)) if logo.exists() else _icono_fallback()
+
+        self.tray = QSystemTrayIcon(icono, self)
+        menu = QMenu()
+        menu.addAction("Cerrar sesión", self._on_cerrar_sesion)
+        menu.addSeparator()
+        menu.addAction("Salir (admin)", self._salida_admin)
+        self.tray.setContextMenu(menu)
+        self.tray.setToolTip("Biblioteca — Control de acceso")
+        self.tray.activated.connect(self._tray_click)
+        self.tray.show()
+
+    def _tray_click(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self._mostrar_login()
 
     def _registrar_atajos(self):
         salida = QShortcut(SALIDA_SECRETA, self)
         salida.activated.connect(self._salida_admin)
+
+    # ── Login / ocultamiento ─────────────────────────────────────────────
+
+    def _mostrar_login(self):
+        self.setWindowFlags(
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.FramelessWindowHint
+        )
+        self.stack.setCurrentIndex(PANTALLA_LOGIN)
+        self.login.limpiar()
+        self.showFullScreen()
+        self.raise_()
+        self.activateWindow()
+
+    def _ocultar_a_tray(self):
+        """Después del login: ocultar ventana, usuario usa PC con normalidad."""
+        self.hide()
+        self.tray.showMessage(
+            "Biblioteca",
+            "Sesión iniciada. En 1 hora se pedirá carnet nuevamente.",
+            QSystemTrayIcon.MessageIcon.Information,
+            4000,
+        )
+
+    # ── Eventos de sesión ────────────────────────────────────────────────
 
     def _on_login(self, estudiante: dict):
         ahora = datetime.now()
@@ -92,34 +138,48 @@ class VentanaKiosko(QMainWindow):
 
         self.bienvenida.iniciar_sesion(estudiante, ahora)
         self.stack.setCurrentIndex(PANTALLA_SESION)
+        self.showFullScreen()
+
+        # Mostrar bienvenida 3 segundos y ocultar
+        QTimer.singleShot(3000, self._ocultar_a_tray)
+
+        # Iniciar temporizador de 1 hora
+        self._timer_sesion.start(DURACION_SESION_MS)
 
     def _on_cerrar_sesion(self):
+        self._timer_sesion.stop()
         if self._sesion_activa_id:
-            hora_fin = datetime.now().isoformat()
-            actualizar_hora_fin(self._sesion_activa_id, hora_fin)
+            actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
             self._sesion_activa_id = None
             self._sesion_inicio = None
 
         self.bienvenida.detener()
-        self.login.limpiar()
-        self.stack.setCurrentIndex(PANTALLA_LOGIN)
+        self._mostrar_login()
+
+    def _sesion_expirada(self):
+        """1 hora cumplida: cerrar sesión y pedir carnet nuevamente."""
+        if self._sesion_activa_id:
+            actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
+            self._sesion_activa_id = None
+            self._sesion_inicio = None
+
+        self.bienvenida.detener()
+        self.tray.showMessage(
+            "Biblioteca",
+            "Sesión de 1 hora completada. Ingrese su carnet para continuar.",
+            QSystemTrayIcon.MessageIcon.Information,
+            3000,
+        )
+        self._mostrar_login()
 
     def _salida_admin(self):
         if self._sesion_activa_id:
-            self._on_cerrar_sesion()
+            actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
+        self._timer_sesion.stop()
+        self.tray.hide()
         QApplication.quit()
 
-    def keyPressEvent(self, event):
-        # Absorber teclas que no son el atajo de salida
-        bloqueadas = {
-            Qt.Key.Key_Escape, Qt.Key.Key_Meta,
-            Qt.Key.Key_Super_L, Qt.Key.Key_Super_R,
-        }
-        if event.key() in bloqueadas:
-            event.accept()
-            return
-        super().keyPressEvent(event)
-
     def closeEvent(self, event):
-        # Prevenir cierre con Alt+F4 o botón X
+        # X oculta a tray en lugar de cerrar
         event.ignore()
+        self.hide()
