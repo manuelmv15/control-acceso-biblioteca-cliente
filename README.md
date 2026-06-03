@@ -112,6 +112,38 @@ autostart\desinstalar_windows.bat
 
 ---
 
+## Detener la aplicación
+
+### Linux
+
+Si corre en terminal: `Ctrl+C`
+
+Si corre en segundo plano o desde autostart:
+
+```bash
+pkill -f "main.py"
+```
+
+Si está instalado como servicio systemd:
+
+```bash
+sudo systemctl stop biblioteca-kiosko
+```
+
+### Windows
+
+Desde Administrador de tareas: buscar proceso `python.exe` → terminar.
+
+O desde terminal:
+
+```cmd
+taskkill /F /IM python.exe
+```
+
+> **Precaución:** `taskkill /F /IM python.exe` cierra **todos** los procesos Python activos en la máquina. Si hay otros programas Python corriendo, usar el Administrador de tareas para cerrar solo el proceso correcto.
+
+---
+
 ## Actualizar a una versión nueva
 
 ### Si está instalado con entorno virtual
