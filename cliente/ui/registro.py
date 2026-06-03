@@ -39,10 +39,12 @@ FACULTADES = [
 
 class PantallaRegistro(QWidget):
     registro_exitoso = pyqtSignal(dict)
+    actualizacion_exitosa = pyqtSignal(dict)
     cancelar = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._modo_actualizacion = False
         self._construir_ui()
 
     def _construir_ui(self):
@@ -110,16 +112,37 @@ class PantallaRegistro(QWidget):
         btn_cancelar.clicked.connect(self.cancelar)
         btn_row.addWidget(btn_cancelar)
 
-        btn_guardar = QPushButton("Registrarme")
-        btn_guardar.clicked.connect(self._guardar)
-        btn_row.addWidget(btn_guardar)
+        self.btn_guardar = QPushButton("Registrarme")
+        self.btn_guardar.clicked.connect(self._guardar)
+        btn_row.addWidget(self.btn_guardar)
         outer.addLayout(btn_row)
+
+    def cargar_datos(self, datos: dict):
+        self._modo_actualizacion = True
+        self.btn_guardar.setText("Actualizar datos")
+        self.nombre.setText(datos.get("nombre", ""))
+        self.carnet.setText(datos.get("carnet", ""))
+        self.carnet.setReadOnly(True)
+        self.fecha_nac.setText(datos.get("fecha_nacimiento", "") or "")
+        idx = self.carrera.findText(datos.get("carrera", ""))
+        if idx >= 0:
+            self.carrera.setCurrentIndex(idx)
+        idx = self.facultad.findText(datos.get("facultad", ""))
+        if idx >= 0:
+            self.facultad.setCurrentIndex(idx)
+        self.departamento.setText(datos.get("departamento", "") or "")
+        sexo = datos.get("sexo", "")
+        for btn in self.sexo_group.buttons():
+            if btn.property("valor") == sexo:
+                btn.setChecked(True)
+                break
+        self.lbl_error.setText("")
 
     def _guardar(self):
         import uuid
         from datetime import date
-        from database import guardar_estudiante_cache
-        from network import registrar_estudiante, hay_conexion
+        from database import guardar_estudiante_cache, buscar_estudiante_cache
+        from network import registrar_estudiante, hay_conexion, obtener_estudiante
 
         nombre = self.nombre.text().strip()
         carnet = self.carnet.text().strip()
@@ -127,6 +150,14 @@ class PantallaRegistro(QWidget):
         if not nombre or not carnet:
             self.lbl_error.setText("Nombre y carnet son obligatorios")
             return
+
+        if not self._modo_actualizacion:
+            existe = buscar_estudiante_cache(carnet)
+            if not existe and hay_conexion():
+                existe = obtener_estudiante(carnet)
+            if existe:
+                self.lbl_error.setText("Este carnet ya está registrado. Inicie sesión con su carnet.")
+                return
 
         sexo_btn = self.sexo_group.checkedButton()
         sexo = sexo_btn.property("valor") if sexo_btn else ""
@@ -148,14 +179,22 @@ class PantallaRegistro(QWidget):
         if hay_conexion():
             ok = registrar_estudiante(datos)
             if not ok:
-                self.lbl_error.setText("Error al registrar en servidor — guardado localmente")
+                self.lbl_error.setText("Error al enviar al servidor — guardado localmente")
         else:
             self.lbl_error.setText("Sin internet — guardado localmente, se sincronizará después")
 
-        self.registro_exitoso.emit(datos)
+        modo = self._modo_actualizacion
         self._limpiar()
 
+        if modo:
+            self.actualizacion_exitosa.emit(datos)
+        else:
+            self.registro_exitoso.emit(datos)
+
     def _limpiar(self):
+        self._modo_actualizacion = False
+        self.btn_guardar.setText("Registrarme")
+        self.carnet.setReadOnly(False)
         self.nombre.clear()
         self.carnet.clear()
         self.fecha_nac.clear()

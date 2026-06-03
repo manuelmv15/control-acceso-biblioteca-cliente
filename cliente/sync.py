@@ -5,7 +5,8 @@ from pathlib import Path
 
 from config import PC_ID, PC_NOMBRE, SYNC_INTERVAL, SERVER_URL
 from database import obtener_pendientes, marcar_sincronizado
-from network import hay_conexion, enviar_sesiones
+from network import hay_conexion, enviar_sesiones, enviar_estado
+import estado as estado_mod
 
 LOG_FILE = Path(__file__).parent / "sync.log"
 logging.basicConfig(
@@ -26,6 +27,16 @@ def _ciclo_sync():
             if not hay_conexion():
                 log.info("Sin conexión — skip")
                 continue
+
+            estado_actual = estado_mod.get_estado()
+            enviar_estado({
+                "pc_id": PC_ID,
+                "pc_nombre": PC_NOMBRE,
+                "sesion_activa": estado_actual["activa"],
+                "carnet": estado_actual["carnet"],
+                "nombre": estado_actual["nombre"],
+                "hora_inicio": estado_actual["hora_inicio"],
+            })
 
             pendientes = obtener_pendientes()
             if not pendientes:

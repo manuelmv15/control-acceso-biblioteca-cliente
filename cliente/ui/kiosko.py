@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -11,14 +11,16 @@ from PyQt6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap, QColor
 from ui.login import PantallaLogin
 from ui.registro import PantallaRegistro
 from ui.bienvenida import PantallaBienvenida
+from ui.flotante import WidgetFlotatante
 from database import guardar_sesion, actualizar_hora_fin
 from config import PC_ID
+import estado as estado_mod
 
 PANTALLA_LOGIN = 0
 PANTALLA_REGISTRO = 1
 PANTALLA_SESION = 2
 
-DURACION_SESION_MS = 60 * 60 * 1000  # 1 hora
+DURACION_SESION_MS = 60 * 60 * 1000  # 60 minutos
 
 SALIDA_SECRETA = QKeySequence(
     QKeyCombination(
@@ -41,6 +43,7 @@ class VentanaKiosko(QMainWindow):
         super().__init__()
         self._sesion_activa_id: str | None = None
         self._sesion_inicio: datetime | None = None
+        self._estudiante_activo: dict | None = None
 
         self._timer_sesion = QTimer(self)
         self._timer_sesion.setSingleShot(True)
@@ -55,7 +58,7 @@ class VentanaKiosko(QMainWindow):
     def _cargar_estilos(self):
         qss_path = Path(__file__).parent / "estilos.qss"
         if qss_path.exists():
-            self.setStyleSheet(qss_path.read_text(encoding="utf-8"))
+            QApplication.instance().setStyleSheet(qss_path.read_text(encoding="utf-8"))
 
     def _construir_ui(self):
         self.stack = QStackedWidget()
@@ -72,8 +75,13 @@ class VentanaKiosko(QMainWindow):
         self.login.login_exitoso.connect(self._on_login)
         self.login.ir_registro.connect(lambda: self.stack.setCurrentIndex(PANTALLA_REGISTRO))
         self.registro.registro_exitoso.connect(self._on_login)
-        self.registro.cancelar.connect(lambda: self.stack.setCurrentIndex(PANTALLA_LOGIN))
+        self.registro.actualizacion_exitosa.connect(self._on_actualizacion_exitosa)
+        self.registro.cancelar.connect(self._on_cancelar_registro)
         self.bienvenida.cerrar_sesion.connect(self._on_cerrar_sesion)
+
+        self.flotante = WidgetFlotatante()
+        self.flotante.cerrar_sesion.connect(self._on_cerrar_sesion)
+        self.flotante.actualizar_datos.connect(self._on_actualizar_datos)
 
     def _configurar_tray(self):
         logo = Path(__file__).parent.parent / "assets" / "logo.png"
@@ -111,7 +119,6 @@ class VentanaKiosko(QMainWindow):
         self.activateWindow()
 
     def _ocultar_a_tray(self):
-        """Después del login: ocultar ventana, usuario usa PC con normalidad."""
         self.hide()
         self.tray.showMessage(
             "Biblioteca",
@@ -119,6 +126,7 @@ class VentanaKiosko(QMainWindow):
             QSystemTrayIcon.MessageIcon.Information,
             4000,
         )
+        self.flotante.iniciar_sesion(self._sesion_inicio, DURACION_SESION_MS)
 
     # ── Eventos de sesión ────────────────────────────────────────────────
 
@@ -126,15 +134,22 @@ class VentanaKiosko(QMainWindow):
         ahora = datetime.now()
         self._sesion_activa_id = str(uuid.uuid4())
         self._sesion_inicio = ahora
+        self._estudiante_activo = estudiante
 
+        hora_fin_estimada = ahora + timedelta(milliseconds=DURACION_SESION_MS)
         guardar_sesion({
             "id": self._sesion_activa_id,
             "pc_id": PC_ID,
             "carnet": estudiante["carnet"],
             "hora_inicio": ahora.isoformat(),
-            "hora_fin": None,
+            "hora_fin": hora_fin_estimada.isoformat(),
             "fecha": date.today().isoformat(),
         })
+        estado_mod.set_sesion_activa(
+            carnet=estudiante["carnet"],
+            nombre=estudiante.get("nombre", ""),
+            hora_inicio=ahora.isoformat(),
+        )
 
         self.bienvenida.iniciar_sesion(estudiante, ahora)
         self.stack.setCurrentIndex(PANTALLA_SESION)
@@ -146,23 +161,49 @@ class VentanaKiosko(QMainWindow):
         # Iniciar temporizador de 1 hora
         self._timer_sesion.start(DURACION_SESION_MS)
 
+    def _on_cancelar_registro(self):
+        self.registro._limpiar()
+        if self._sesion_activa_id:
+            self.hide()
+        else:
+            self._mostrar_login()
+
+    def _on_actualizar_datos(self):
+        if self._estudiante_activo:
+            self.registro.cargar_datos(self._estudiante_activo)
+            self.stack.setCurrentIndex(PANTALLA_REGISTRO)
+            self.showFullScreen()
+
+    def _on_actualizacion_exitosa(self, datos: dict):
+        self._estudiante_activo = datos
+        self.hide()
+        self.tray.showMessage(
+            "Biblioteca",
+            "Datos actualizados correctamente.",
+            QSystemTrayIcon.MessageIcon.Information,
+            3000,
+        )
+
     def _on_cerrar_sesion(self):
         self._timer_sesion.stop()
         if self._sesion_activa_id:
             actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
             self._sesion_activa_id = None
             self._sesion_inicio = None
+        self._estudiante_activo = None
+        estado_mod.set_sesion_inactiva()
 
+        self.flotante.detener()
         self.bienvenida.detener()
         self._mostrar_login()
 
     def _sesion_expirada(self):
-        """1 hora cumplida: cerrar sesión y pedir carnet nuevamente."""
-        if self._sesion_activa_id:
-            actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
-            self._sesion_activa_id = None
-            self._sesion_inicio = None
+        self._sesion_activa_id = None
+        self._sesion_inicio = None
+        self._estudiante_activo = None
+        estado_mod.set_sesion_inactiva()
 
+        self.flotante.detener()
         self.bienvenida.detener()
         self.tray.showMessage(
             "Biblioteca",
