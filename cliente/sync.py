@@ -1,6 +1,5 @@
 import logging
 import threading
-import time
 from pathlib import Path
 
 from config import PC_ID, PC_NOMBRE, SYNC_INTERVAL, SERVER_URL
@@ -19,44 +18,56 @@ logging.basicConfig(
 )
 log = logging.getLogger("sync")
 
+_wake = threading.Event()
+
+
+def _ejecutar_ciclo():
+    if not hay_conexion():
+        log.info("Sin conexión — skip")
+        return
+
+    estado_actual = estado_mod.get_estado()
+    enviar_estado({
+        "pc_id": PC_ID,
+        "pc_nombre": PC_NOMBRE,
+        "sesion_activa": estado_actual["activa"],
+        "carnet": estado_actual["carnet"],
+        "nombre": estado_actual["nombre"],
+        "hora_inicio": estado_actual["hora_inicio"],
+    })
+
+    pendientes = obtener_pendientes()
+    if not pendientes:
+        log.info("Sin pendientes")
+        return
+
+    payload = {
+        "pc_id": PC_ID,
+        "pc_nombre": PC_NOMBRE,
+        "sesiones": pendientes,
+    }
+    ok = enviar_sesiones(payload)
+    if ok:
+        ids = [s["id"] for s in pendientes]
+        marcar_sincronizado(ids)
+        log.info(f"Sincronizadas {len(ids)} sesiones")
+    else:
+        log.warning("Servidor rechazó el payload — reintentará")
+
 
 def _ciclo_sync():
     while True:
-        time.sleep(SYNC_INTERVAL)
+        _wake.wait(timeout=SYNC_INTERVAL)
+        _wake.clear()
         try:
-            if not hay_conexion():
-                log.info("Sin conexión — skip")
-                continue
-
-            estado_actual = estado_mod.get_estado()
-            enviar_estado({
-                "pc_id": PC_ID,
-                "pc_nombre": PC_NOMBRE,
-                "sesion_activa": estado_actual["activa"],
-                "carnet": estado_actual["carnet"],
-                "nombre": estado_actual["nombre"],
-                "hora_inicio": estado_actual["hora_inicio"],
-            })
-
-            pendientes = obtener_pendientes()
-            if not pendientes:
-                log.info("Sin pendientes")
-                continue
-
-            payload = {
-                "pc_id": PC_ID,
-                "pc_nombre": PC_NOMBRE,
-                "sesiones": pendientes,
-            }
-            ok = enviar_sesiones(payload)
-            if ok:
-                ids = [s["id"] for s in pendientes]
-                marcar_sincronizado(ids)
-                log.info(f"Sincronizadas {len(ids)} sesiones")
-            else:
-                log.warning("Servidor rechazó el payload — reintentará")
+            _ejecutar_ciclo()
         except Exception as e:
             log.error(f"Error inesperado: {e}")
+
+
+def forzar_sync():
+    """Despierta el daemon para sincronizar ahora sin esperar el intervalo."""
+    _wake.set()
 
 
 def iniciar():

@@ -14,6 +14,7 @@ from ui.bienvenida import PantallaBienvenida
 from ui.flotante import WidgetFlotatante
 from database import guardar_sesion, actualizar_hora_fin
 from config import PC_ID
+from sync import forzar_sync
 import estado as estado_mod
 
 PANTALLA_LOGIN = 0
@@ -192,16 +193,20 @@ class VentanaKiosko(QMainWindow):
             self._sesion_inicio = None
         self._estudiante_activo = None
         estado_mod.set_sesion_inactiva()
+        forzar_sync()
 
         self.flotante.detener()
         self.bienvenida.detener()
         self._mostrar_login()
 
     def _sesion_expirada(self):
+        if self._sesion_activa_id:
+            actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
         self._sesion_activa_id = None
         self._sesion_inicio = None
         self._estudiante_activo = None
         estado_mod.set_sesion_inactiva()
+        forzar_sync()
 
         self.flotante.detener()
         self.bienvenida.detener()
