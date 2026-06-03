@@ -34,6 +34,11 @@ def _ejecutar_ciclo():
         "carnet": estado_actual["carnet"],
         "nombre": estado_actual["nombre"],
         "hora_inicio": estado_actual["hora_inicio"],
+        "carrera": estado_actual["carrera"],
+        "facultad": estado_actual["facultad"],
+        "departamento": estado_actual["departamento"],
+        "sexo": estado_actual["sexo"],
+        "fecha_nacimiento": estado_actual["fecha_nacimiento"],
     })
 
     pendientes = obtener_pendientes()
@@ -41,10 +46,24 @@ def _ejecutar_ciclo():
         log.info("Sin pendientes")
         return
 
+    from database import buscar_estudiante_cache
+    sesiones_enriquecidas = []
+    for s in pendientes:
+        est = buscar_estudiante_cache(s["carnet"])
+        sesion = dict(s)
+        if est:
+            sesion["nombre"] = est.get("nombre")
+            sesion["carrera"] = est.get("carrera")
+            sesion["facultad"] = est.get("facultad")
+            sesion["departamento"] = est.get("departamento")
+            sesion["sexo"] = est.get("sexo")
+            sesion["fecha_nacimiento"] = est.get("fecha_nacimiento")
+        sesiones_enriquecidas.append(sesion)
+
     payload = {
         "pc_id": PC_ID,
         "pc_nombre": PC_NOMBRE,
-        "sesiones": pendientes,
+        "sesiones": sesiones_enriquecidas,
     }
     ok = enviar_sesiones(payload)
     if ok:

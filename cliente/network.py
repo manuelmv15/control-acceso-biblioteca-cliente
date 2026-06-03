@@ -28,6 +28,14 @@ def registrar_estudiante(datos: dict) -> bool:
         return False
 
 
+def actualizar_estudiante(carnet: str, datos: dict) -> bool:
+    try:
+        r = requests.put(f"{SERVER_URL}/estudiantes/{carnet}", json=datos, timeout=8)
+        return r.status_code in (200, 201)
+    except Exception:
+        return False
+
+
 def enviar_estado(payload: dict) -> bool:
     try:
         r = requests.post(f"{SERVER_URL}/estado", json=payload, timeout=5)

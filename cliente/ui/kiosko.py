@@ -149,6 +149,11 @@ class VentanaKiosko(QMainWindow):
             carnet=estudiante["carnet"],
             nombre=estudiante.get("nombre", ""),
             hora_inicio=ahora.isoformat(),
+            carrera=estudiante.get("carrera"),
+            facultad=estudiante.get("facultad"),
+            departamento=estudiante.get("departamento"),
+            sexo=estudiante.get("sexo"),
+            fecha_nacimiento=estudiante.get("fecha_nacimiento"),
         )
 
         self.bienvenida.iniciar_sesion(estudiante, ahora)
@@ -176,6 +181,19 @@ class VentanaKiosko(QMainWindow):
 
     def _on_actualizacion_exitosa(self, datos: dict):
         self._estudiante_activo = datos
+        if self._sesion_activa_id:
+            estado_mod.set_sesion_activa(
+                carnet=datos["carnet"],
+                nombre=datos.get("nombre", ""),
+                hora_inicio=self._sesion_inicio.isoformat() if self._sesion_inicio else "",
+                carrera=datos.get("carrera"),
+                facultad=datos.get("facultad"),
+                departamento=datos.get("departamento"),
+                sexo=datos.get("sexo"),
+                fecha_nacimiento=datos.get("fecha_nacimiento"),
+            )
+            from sync import forzar_sync
+            forzar_sync()
         self.hide()
         self.tray.showMessage(
             "Biblioteca",

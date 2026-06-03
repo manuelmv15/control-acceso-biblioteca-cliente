@@ -177,7 +177,11 @@ class PantallaRegistro(QWidget):
         guardar_estudiante_cache({**datos, "nombre": nombre})
 
         if hay_conexion():
-            ok = registrar_estudiante(datos)
+            if self._modo_actualizacion:
+                from network import actualizar_estudiante
+                ok = actualizar_estudiante(carnet, datos)
+            else:
+                ok = registrar_estudiante(datos)
             if not ok:
                 self.lbl_error.setText("Error al enviar al servidor — guardado localmente")
         else:
