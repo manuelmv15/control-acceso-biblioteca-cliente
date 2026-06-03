@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from datetime import datetime
+from config import now_sv
 
 
 class PantallaBienvenida(QWidget):
@@ -76,7 +76,7 @@ class PantallaBienvenida(QWidget):
     def _actualizar_timer(self):
         if not self._sesion_inicio:
             return
-        delta = datetime.now() - self._sesion_inicio
+        delta = now_sv() - self._sesion_inicio
         total = int(delta.total_seconds())
         h = total // 3600
         m = (total % 3600) // 60

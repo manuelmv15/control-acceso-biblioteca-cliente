@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import date
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -13,7 +13,7 @@ from ui.registro import PantallaRegistro
 from ui.bienvenida import PantallaBienvenida
 from ui.flotante import WidgetFlotatante
 from database import guardar_sesion, actualizar_hora_fin
-from config import PC_ID
+from config import PC_ID, now_sv
 from sync import forzar_sync
 import estado as estado_mod
 
@@ -132,7 +132,7 @@ class VentanaKiosko(QMainWindow):
     # ── Eventos de sesión ────────────────────────────────────────────────
 
     def _on_login(self, estudiante: dict):
-        ahora = datetime.now()
+        ahora = now_sv()
         self._sesion_activa_id = str(uuid.uuid4())
         self._sesion_inicio = ahora
         self._estudiante_activo = estudiante
@@ -205,7 +205,7 @@ class VentanaKiosko(QMainWindow):
     def _on_cerrar_sesion(self):
         self._timer_sesion.stop()
         if self._sesion_activa_id:
-            actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
+            actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
             self._sesion_activa_id = None
             self._sesion_inicio = None
         self._estudiante_activo = None
@@ -218,7 +218,7 @@ class VentanaKiosko(QMainWindow):
 
     def _sesion_expirada(self):
         if self._sesion_activa_id:
-            actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
+            actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
         self._sesion_activa_id = None
         self._sesion_inicio = None
         self._estudiante_activo = None
@@ -237,7 +237,7 @@ class VentanaKiosko(QMainWindow):
 
     def _salida_admin(self):
         if self._sesion_activa_id:
-            actualizar_hora_fin(self._sesion_activa_id, datetime.now().isoformat())
+            actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
         self._timer_sesion.stop()
         self.tray.hide()
         QApplication.quit()

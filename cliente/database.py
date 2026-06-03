@@ -72,8 +72,8 @@ def obtener_pendientes() -> list:
 def marcar_sincronizado(ids: list):
     if not ids:
         return
-    from datetime import datetime
-    ahora = datetime.utcnow().isoformat()
+    from config import now_sv
+    ahora = now_sv().isoformat()
     conn = get_connection()
     placeholders = ",".join("?" * len(ids))
     conn.execute(

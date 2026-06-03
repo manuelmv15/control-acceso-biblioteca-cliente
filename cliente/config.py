@@ -1,7 +1,15 @@
 import os
 import uuid
 import configparser
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+TZ_SV = ZoneInfo("America/El_Salvador")
+
+
+def now_sv() -> datetime:
+    return datetime.now(TZ_SV)
 
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "config.ini"

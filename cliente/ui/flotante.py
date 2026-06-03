@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplication
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from datetime import datetime
+from config import now_sv
 
 
 class WidgetFlotatante(QWidget):
@@ -95,7 +95,7 @@ class WidgetFlotatante(QWidget):
     def _actualizar(self):
         if not self._sesion_inicio:
             return
-        transcurrido_s = (datetime.now() - self._sesion_inicio).total_seconds()
+        transcurrido_s = (now_sv() - self._sesion_inicio).total_seconds()
         restante_s = max(0, self._duracion_ms / 1000 - transcurrido_s)
         h = int(restante_s) // 3600
         m = (int(restante_s) % 3600) // 60
