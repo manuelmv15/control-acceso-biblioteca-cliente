@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
@@ -137,13 +137,12 @@ class VentanaKiosko(QMainWindow):
         self._sesion_inicio = ahora
         self._estudiante_activo = estudiante
 
-        hora_fin_estimada = ahora + timedelta(milliseconds=DURACION_SESION_MS)
         guardar_sesion({
             "id": self._sesion_activa_id,
             "pc_id": PC_ID,
             "carnet": estudiante["carnet"],
             "hora_inicio": ahora.isoformat(),
-            "hora_fin": hora_fin_estimada.isoformat(),
+            "hora_fin": None,
             "fecha": date.today().isoformat(),
         })
         estado_mod.set_sesion_activa(
