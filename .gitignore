@@ -43,6 +43,4 @@ build/
 # Windows
 Thumbs.db
 desktop.ini
-
-
-CLAUDE.md
+docs/
