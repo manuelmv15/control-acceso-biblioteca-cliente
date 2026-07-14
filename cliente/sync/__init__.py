@@ -2,12 +2,14 @@ import logging
 import threading
 from pathlib import Path
 
-from config import PC_ID, PC_NOMBRE, SYNC_INTERVAL, SERVER_URL
-from database import obtener_pendientes, marcar_sincronizado
-from network import hay_conexion, enviar_sesiones, enviar_estado
-import estado as estado_mod
+from core.config import PC_ID, PC_NOMBRE, SYNC_INTERVAL, SERVER_URL
+from db.sesiones import obtener_pendientes, marcar_sincronizado
+from db.estudiantes import buscar_estudiante_cache
+from network.client import hay_conexion
+from network.sesiones import enviar_sesiones, enviar_estado
+import core.estado as estado_mod
 
-LOG_FILE = Path(__file__).parent / "sync.log"
+LOG_FILE = Path(__file__).parent.parent / "sync.log"
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [SYNC] %(message)s",
@@ -46,18 +48,18 @@ def _ejecutar_ciclo():
         log.info("Sin pendientes")
         return
 
-    from database import buscar_estudiante_cache
     sesiones_enriquecidas = []
     for s in pendientes:
-        est = buscar_estudiante_cache(s["carnet"])
         sesion = dict(s)
-        if est:
-            sesion["nombre"] = est.get("nombre")
-            sesion["carrera"] = est.get("carrera")
-            sesion["facultad"] = est.get("facultad")
-            sesion["departamento"] = est.get("departamento")
-            sesion["sexo"] = est.get("sexo")
-            sesion["fecha_nacimiento"] = est.get("fecha_nacimiento")
+        if s["carnet"]:
+            est = buscar_estudiante_cache(s["carnet"])
+            if est:
+                sesion["nombre"] = est.get("nombre")
+                sesion["carrera"] = est.get("carrera")
+                sesion["facultad"] = est.get("facultad")
+                sesion["departamento"] = est.get("departamento")
+                sesion["sexo"] = est.get("sexo")
+                sesion["fecha_nacimiento"] = est.get("fecha_nacimiento")
         sesiones_enriquecidas.append(sesion)
 
     payload = {

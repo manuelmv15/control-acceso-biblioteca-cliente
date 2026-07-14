@@ -11,7 +11,7 @@ TZ_SV = ZoneInfo("America/El_Salvador")
 def now_sv() -> datetime:
     return datetime.now(TZ_SV)
 
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).parent.parent
 CONFIG_FILE = BASE_DIR / "config.ini"
 PC_ID_FILE = BASE_DIR / ".pc_id"
 
@@ -40,3 +40,8 @@ SERVER_URL: str = _get("servidor", "url", "BIBLIOTECA_SERVER_URL", "http://local
 PC_ID: str = _load_pc_id()
 PC_NOMBRE: str = _get("pc", "nombre", "BIBLIOTECA_PC_NOMBRE", "PC-00")
 SYNC_INTERVAL: int = int(_get("sync", "intervalo_segundos", default="30"))
+
+DURACION_SESION_MINUTOS: int = int(_get("sesion", "duracion_minutos", default="60"))
+DURACION_SESION_MS: int = DURACION_SESION_MINUTOS * 60 * 1000
+
+HARDWARE_INTERVAL_SEGUNDOS: int = int(_get("hardware", "intervalo_segundos", default="300"))

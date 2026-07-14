@@ -1,13 +1,5 @@
 import requests
-from config import SERVER_URL
-
-
-def hay_conexion(timeout: int = 5) -> bool:
-    try:
-        r = requests.get(f"{SERVER_URL}/health", timeout=timeout)
-        return r.status_code == 200
-    except Exception:
-        return False
+from core.config import SERVER_URL
 
 
 def obtener_estudiante(carnet: str) -> dict | None:
@@ -32,21 +24,5 @@ def actualizar_estudiante(carnet: str, datos: dict) -> bool:
     try:
         r = requests.put(f"{SERVER_URL}/estudiantes/{carnet}", json=datos, timeout=8)
         return r.status_code in (200, 201)
-    except Exception:
-        return False
-
-
-def enviar_estado(payload: dict) -> bool:
-    try:
-        r = requests.post(f"{SERVER_URL}/estado", json=payload, timeout=5)
-        return r.status_code == 200
-    except Exception:
-        return False
-
-
-def enviar_sesiones(payload: dict) -> bool:
-    try:
-        r = requests.post(f"{SERVER_URL}/sync", json=payload, timeout=15)
-        return r.status_code == 200
     except Exception:
         return False

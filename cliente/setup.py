@@ -64,7 +64,7 @@ def main():
 
     # Crear DB local
     sys.path.insert(0, str(BASE_DIR))
-    from database import init_db
+    from db import init_db
     init_db()
     print("  Base de datos local inicializada")
 

@@ -14,7 +14,7 @@ _estado = {
 }
 
 
-def set_sesion_activa(carnet: str, nombre: str, hora_inicio: str,
+def set_sesion_activa(carnet: str | None, nombre: str, hora_inicio: str,
                       carrera: str = None, facultad: str = None,
                       departamento: str = None, sexo: str = None,
                       fecha_nacimiento: str = None):
