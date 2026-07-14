@@ -40,7 +40,18 @@ fi
 
 echo ""
 echo "Actualizando dependencias..."
-"$PYTHON" -m pip install -q -r "$APP_DIR/requirements.txt"
+if ! "$PYTHON" -m pip install -q -r "$APP_DIR/requirements.txt" 2>/tmp/pip-error-$$; then
+    if grep -q "externally-managed-environment" /tmp/pip-error-$$; then
+        echo "El entorno de Python es externally-managed (PEP 668) — reintentando con --break-system-packages."
+        echo "Esta PC es de uso dedicado para el kiosko, así que instalar en el Python del sistema es seguro."
+        "$PYTHON" -m pip install -q --break-system-packages -r "$APP_DIR/requirements.txt"
+    else
+        cat /tmp/pip-error-$$ >&2
+        rm -f /tmp/pip-error-$$
+        exit 1
+    fi
+fi
+rm -f /tmp/pip-error-$$
 
 echo ""
 if systemctl is-enabled "$SERVICE_NAME" &>/dev/null; then
