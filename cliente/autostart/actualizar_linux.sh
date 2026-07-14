@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_DIR="$(cd "$APP_DIR/.." && pwd)"
+PYTHON="${PYTHON:-python3}"
+SERVICE_NAME="biblioteca-kiosko"
+
+echo "=== Actualizando Biblioteca Kiosko ==="
+
+if [[ ! -d "$REPO_DIR/.git" ]]; then
+    echo "ERROR: $REPO_DIR no es un repositorio git. No se puede actualizar."
+    exit 1
+fi
+
+cd "$REPO_DIR"
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+echo "Rama actual: $BRANCH"
+
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+    echo "ERROR: hay cambios locales sin confirmar en el repositorio."
+    echo "Resuélvelos antes de actualizar (git stash / git checkout -- .)."
+    exit 1
+fi
+
+echo "Descargando cambios..."
+git fetch origin "$BRANCH"
+
+LOCAL_REV="$(git rev-parse HEAD)"
+REMOTE_REV="$(git rev-parse "origin/$BRANCH")"
+
+if [[ "$LOCAL_REV" == "$REMOTE_REV" ]]; then
+    echo "Ya está en la última versión ($LOCAL_REV)."
+else
+    echo "Aplicando actualización ($LOCAL_REV -> $REMOTE_REV)..."
+    git merge --ff-only "origin/$BRANCH"
+fi
+
+echo ""
+echo "Actualizando dependencias..."
+"$PYTHON" -m pip install -q -r "$APP_DIR/requirements.txt"
+
+echo ""
+if systemctl is-enabled "$SERVICE_NAME" &>/dev/null; then
+    echo "Reiniciando servicio systemd..."
+    sudo systemctl restart "$SERVICE_NAME"
+    echo "Servicio reiniciado con la nueva versión."
+elif pgrep -f "$APP_DIR/main.py" &>/dev/null; then
+    echo "AVISO: la app está corriendo vía autostart de sesión (sin systemd)."
+    echo "Cierra la app y vuelve a abrirla (o reinicia sesión) para aplicar los cambios."
+else
+    echo "Actualización lista. Se aplicará la próxima vez que inicie la app."
+fi
+
+echo ""
+echo "=== Actualización completada ==="

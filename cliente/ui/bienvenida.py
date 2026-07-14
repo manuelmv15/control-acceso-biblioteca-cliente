@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from datetime import datetime
 from config import now_sv
 
 

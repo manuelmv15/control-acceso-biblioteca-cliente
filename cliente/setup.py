@@ -45,20 +45,6 @@ Hidden=false
     print(f"  Autostart creado: {desktop_file}")
 
 
-def instalar_autostart_windows(app_path: str):
-    import winreg
-    python = sys.executable
-    cmd = f'"{python}" "{app_path}"'
-    key = winreg.OpenKey(
-        winreg.HKEY_CURRENT_USER,
-        r"Software\Microsoft\Windows\CurrentVersion\Run",
-        0, winreg.KEY_SET_VALUE
-    )
-    winreg.SetValueEx(key, "BibliotecaKiosko", 0, winreg.REG_SZ, cmd)
-    winreg.CloseKey(key)
-    print(f"  Autostart registrado en HKCU\\...\\Run")
-
-
 def main():
     print("=== Configuración de PC Biblioteca ===\n")
 
@@ -86,13 +72,7 @@ def main():
     instalar = preguntar("\n¿Instalar autostart? (s/n)", "s").lower()
     if instalar == "s":
         app_main = str(BASE_DIR / "main.py")
-        if sys.platform == "win32":
-            try:
-                instalar_autostart_windows(app_main)
-            except Exception as e:
-                print(f"  Error autostart Windows: {e}")
-        else:
-            instalar_autostart_linux(app_main)
+        instalar_autostart_linux(app_main)
 
     print(f"\n=== Configuración completa ===")
     print(f"  PC: {nombre}")

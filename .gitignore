@@ -44,3 +44,6 @@ build/
 Thumbs.db
 desktop.ini
 docs/
+
+# Entorno de prueba Docker para cliente/ (no es parte de la app ni del despliegue)
+cliente/docker/
