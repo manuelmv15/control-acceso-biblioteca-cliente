@@ -9,6 +9,7 @@ from pathlib import Path
 class PantallaLogin(QWidget):
     login_exitoso = pyqtSignal(dict)
     ir_registro = pyqtSignal()
+    entrar_invitado = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -66,12 +67,18 @@ class PantallaLogin(QWidget):
         btn_row.addWidget(btn_entrar)
 
         layout.addLayout(btn_row)
+
+        btn_invitado = QPushButton("Entrar como Invitado")
+        btn_invitado.setObjectName("btn-secundario")
+        btn_invitado.clicked.connect(self.entrar_invitado)
+        layout.addWidget(btn_invitado)
+
         layout.addSpacerItem(QSpacerItem(0, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
     def _intentar_login(self):
-        from database import buscar_estudiante_cache
-        from network import obtener_estudiante, hay_conexion
-        from database import guardar_estudiante_cache
+        from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache
+        from network.estudiantes import obtener_estudiante
+        from network.client import hay_conexion
 
         carnet = self.carnet_input.text().strip()
         if not carnet:

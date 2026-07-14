@@ -12,16 +12,14 @@ from ui.login import PantallaLogin
 from ui.registro import PantallaRegistro
 from ui.bienvenida import PantallaBienvenida
 from ui.flotante import WidgetFlotatante
-from database import guardar_sesion, actualizar_hora_fin
-from config import PC_ID, now_sv
+from db.sesiones import guardar_sesion, actualizar_hora_fin
+from core.config import PC_ID, DURACION_SESION_MS, now_sv
 from sync import forzar_sync
-import estado as estado_mod
+import core.estado as estado_mod
 
 PANTALLA_LOGIN = 0
 PANTALLA_REGISTRO = 1
 PANTALLA_SESION = 2
-
-DURACION_SESION_MS = 60 * 60 * 1000  # 60 minutos
 
 SALIDA_SECRETA = QKeySequence(
     QKeyCombination(
@@ -45,6 +43,7 @@ class VentanaKiosko(QMainWindow):
         self._sesion_activa_id: str | None = None
         self._sesion_inicio: datetime | None = None
         self._estudiante_activo: dict | None = None
+        self._es_invitado: bool = False
 
         self._timer_sesion = QTimer(self)
         self._timer_sesion.setSingleShot(True)
@@ -75,6 +74,7 @@ class VentanaKiosko(QMainWindow):
 
         self.login.login_exitoso.connect(self._on_login)
         self.login.ir_registro.connect(lambda: self.stack.setCurrentIndex(PANTALLA_REGISTRO))
+        self.login.entrar_invitado.connect(self._on_login_invitado)
         self.registro.registro_exitoso.connect(self._on_login)
         self.registro.actualizacion_exitosa.connect(self._on_actualizacion_exitosa)
         self.registro.cancelar.connect(self._on_cancelar_registro)
@@ -123,48 +123,57 @@ class VentanaKiosko(QMainWindow):
         self.hide()
         self.tray.showMessage(
             "Biblioteca",
-            "Sesión iniciada. En 1 hora se pedirá carnet nuevamente.",
+            "Sesión iniciada.",
             QSystemTrayIcon.MessageIcon.Information,
             4000,
         )
-        self.flotante.iniciar_sesion(self._sesion_inicio, DURACION_SESION_MS)
+        self.flotante.iniciar_sesion(self._sesion_inicio, DURACION_SESION_MS, self._es_invitado)
 
     # ── Eventos de sesión ────────────────────────────────────────────────
 
-    def _on_login(self, estudiante: dict):
+    def _on_login(self, estudiante: dict | None):
+        """estudiante=None representa una sesión de Invitado: sin carnet ni
+        datos personales, misma duración de sesión que un estudiante."""
         ahora = now_sv()
         self._sesion_activa_id = str(uuid.uuid4())
         self._sesion_inicio = ahora
         self._estudiante_activo = estudiante
+        self._es_invitado = estudiante is None
 
+        carnet = estudiante["carnet"] if estudiante else None
         guardar_sesion({
             "id": self._sesion_activa_id,
             "pc_id": PC_ID,
-            "carnet": estudiante["carnet"],
+            "carnet": carnet,
             "hora_inicio": ahora.isoformat(),
             "hora_fin": None,
             "fecha": date.today().isoformat(),
         })
         estado_mod.set_sesion_activa(
-            carnet=estudiante["carnet"],
-            nombre=estudiante.get("nombre", ""),
+            carnet=carnet,
+            nombre=estudiante.get("nombre", "") if estudiante else "Invitado",
             hora_inicio=ahora.isoformat(),
-            carrera=estudiante.get("carrera"),
-            facultad=estudiante.get("facultad"),
-            departamento=estudiante.get("departamento"),
-            sexo=estudiante.get("sexo"),
-            fecha_nacimiento=estudiante.get("fecha_nacimiento"),
+            carrera=estudiante.get("carrera") if estudiante else None,
+            facultad=estudiante.get("facultad") if estudiante else None,
+            departamento=estudiante.get("departamento") if estudiante else None,
+            sexo=estudiante.get("sexo") if estudiante else None,
+            fecha_nacimiento=estudiante.get("fecha_nacimiento") if estudiante else None,
         )
 
-        self.bienvenida.iniciar_sesion(estudiante, ahora)
+        estudiante_mostrado = estudiante or {
+            "nombre": "Invitado", "carrera": "Sesión de invitado", "carnet": None,
+        }
+        self.bienvenida.iniciar_sesion(estudiante_mostrado, ahora)
         self.stack.setCurrentIndex(PANTALLA_SESION)
         self.showFullScreen()
 
         # Mostrar bienvenida 3 segundos y ocultar
         QTimer.singleShot(3000, self._ocultar_a_tray)
 
-        # Iniciar temporizador de 1 hora
         self._timer_sesion.start(DURACION_SESION_MS)
+
+    def _on_login_invitado(self):
+        self._on_login(None)
 
     def _on_cancelar_registro(self):
         self.registro._limpiar()
@@ -209,6 +218,7 @@ class VentanaKiosko(QMainWindow):
             self._sesion_activa_id = None
             self._sesion_inicio = None
         self._estudiante_activo = None
+        self._es_invitado = False
         estado_mod.set_sesion_inactiva()
         forzar_sync()
 
@@ -222,6 +232,7 @@ class VentanaKiosko(QMainWindow):
         self._sesion_activa_id = None
         self._sesion_inicio = None
         self._estudiante_activo = None
+        self._es_invitado = False
         estado_mod.set_sesion_inactiva()
         forzar_sync()
 
@@ -229,7 +240,7 @@ class VentanaKiosko(QMainWindow):
         self.bienvenida.detener()
         self.tray.showMessage(
             "Biblioteca",
-            "Sesión de 1 hora completada. Ingrese su carnet para continuar.",
+            "Sesión completada. Ingrese su carnet para continuar.",
             QSystemTrayIcon.MessageIcon.Information,
             3000,
         )

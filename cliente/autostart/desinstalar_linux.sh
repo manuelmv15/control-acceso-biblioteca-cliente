@@ -67,6 +67,10 @@ limpiar_artefactos() {
     if [[ -f "$APP_DIR/sync.log" ]] && ! rm -f "$APP_DIR/sync.log" 2>/dev/null; then
         sudo rm -f "$APP_DIR/sync.log"
     fi
+
+    if [[ -f "$APP_DIR/hardware.log" ]] && ! rm -f "$APP_DIR/hardware.log" 2>/dev/null; then
+        sudo rm -f "$APP_DIR/hardware.log"
+    fi
 }
 
 limpiar_artefactos
@@ -108,6 +112,12 @@ if [[ -f "$APP_DIR/sync.log" ]]; then
     echo "AVISO: sync.log se sigue regenerando. Revisa si hay algún proceso corriendo main.py (ps -ef | grep main.py)."
 else
     echo "sync.log eliminado."
+fi
+
+if [[ -f "$APP_DIR/hardware.log" ]]; then
+    echo "AVISO: hardware.log se sigue regenerando. Revisa si hay algún proceso corriendo main.py (ps -ef | grep main.py)."
+else
+    echo "hardware.log eliminado."
 fi
 
 echo ""

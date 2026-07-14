@@ -78,11 +78,16 @@ def salud() -> dict:
                     ["smartctl", "-H", disco],
                     capture_output=True, text=True, timeout=5,
                 )
-                salida = r.stdout.lower()
-                if "passed" in salida:
-                    disco_smart_ok = True
-                elif "failed" in salida:
-                    disco_smart_ok = False
+                # returncode != 0 cubre "permission denied"/dispositivo no
+                # abierto — la palabra "failed" aparece ahí también, así que
+                # solo se confía en la línea de resultado si el comando
+                # realmente pudo leer el estado SMART.
+                if r.returncode == 0:
+                    salida = r.stdout.lower()
+                    if "self-assessment test result: passed" in salida:
+                        disco_smart_ok = True
+                    elif "self-assessment test result: failed" in salida:
+                        disco_smart_ok = False
             except Exception:
                 pass
             break

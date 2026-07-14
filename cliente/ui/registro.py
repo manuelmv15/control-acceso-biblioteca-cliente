@@ -141,8 +141,9 @@ class PantallaRegistro(QWidget):
     def _guardar(self):
         import uuid
         from datetime import date
-        from database import guardar_estudiante_cache, buscar_estudiante_cache
-        from network import registrar_estudiante, hay_conexion, obtener_estudiante
+        from db.estudiantes import guardar_estudiante_cache, buscar_estudiante_cache
+        from network.estudiantes import registrar_estudiante, obtener_estudiante
+        from network.client import hay_conexion
 
         nombre = self.nombre.text().strip()
         carnet = self.carnet.text().strip()
@@ -178,7 +179,7 @@ class PantallaRegistro(QWidget):
 
         if hay_conexion():
             if self._modo_actualizacion:
-                from network import actualizar_estudiante
+                from network.estudiantes import actualizar_estudiante
                 ok = actualizar_estudiante(carnet, datos)
             else:
                 ok = registrar_estudiante(datos)

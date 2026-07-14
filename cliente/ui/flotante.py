@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QApplication
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from datetime import datetime
-from config import now_sv
+from core.config import now_sv
 
 
 class WidgetFlotatante(QWidget):
@@ -43,10 +43,10 @@ class WidgetFlotatante(QWidget):
         self.lbl_tiempo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         panel_layout.addWidget(self.lbl_tiempo)
 
-        btn_actualizar = QPushButton("Actualizar mis datos")
-        btn_actualizar.setObjectName("btn-secundario")
-        btn_actualizar.clicked.connect(self.actualizar_datos)
-        panel_layout.addWidget(btn_actualizar)
+        self.btn_actualizar = QPushButton("Actualizar mis datos")
+        self.btn_actualizar.setObjectName("btn-secundario")
+        self.btn_actualizar.clicked.connect(self.actualizar_datos)
+        panel_layout.addWidget(self.btn_actualizar)
 
         btn_cerrar = QPushButton("Cerrar Sesión")
         btn_cerrar.setObjectName("btn-cerrar-sesion")
@@ -75,10 +75,11 @@ class WidgetFlotatante(QWidget):
         y = screen.bottom() - self.height() - margin
         self.move(x, y)
 
-    def iniciar_sesion(self, hora_inicio: datetime, duracion_ms: int):
+    def iniciar_sesion(self, hora_inicio: datetime, duracion_ms: int, es_invitado: bool = False):
         self._sesion_inicio = hora_inicio
         self._duracion_ms = duracion_ms
         self._expandido = False
+        self.btn_actualizar.setVisible(not es_invitado)
         self.panel.hide()
         self._actualizar()
         self._timer.start(1000)
