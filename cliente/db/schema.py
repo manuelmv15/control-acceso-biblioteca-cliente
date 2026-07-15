@@ -48,7 +48,6 @@ def init_db():
             nombre TEXT NOT NULL,
             carrera TEXT,
             facultad TEXT,
-            departamento TEXT,
             fecha_nacimiento TEXT,
             sexo TEXT
         );

@@ -97,7 +97,6 @@ class PantallaLogin(QWidget):
                     "nombre": datos.get("nombre", ""),
                     "carrera": datos.get("carrera", ""),
                     "facultad": datos.get("facultad", ""),
-                    "departamento": datos.get("departamento", ""),
                     "fecha_nacimiento": datos.get("fecha_nacimiento", ""),
                     "sexo": datos.get("sexo", ""),
                 })

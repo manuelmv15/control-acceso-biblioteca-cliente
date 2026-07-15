@@ -38,7 +38,6 @@ def _ejecutar_ciclo():
         "hora_inicio": estado_actual["hora_inicio"],
         "carrera": estado_actual["carrera"],
         "facultad": estado_actual["facultad"],
-        "departamento": estado_actual["departamento"],
         "sexo": estado_actual["sexo"],
         "fecha_nacimiento": estado_actual["fecha_nacimiento"],
     })
@@ -57,7 +56,6 @@ def _ejecutar_ciclo():
                 sesion["nombre"] = est.get("nombre")
                 sesion["carrera"] = est.get("carrera")
                 sesion["facultad"] = est.get("facultad")
-                sesion["departamento"] = est.get("departamento")
                 sesion["sexo"] = est.get("sexo")
                 sesion["fecha_nacimiento"] = est.get("fecha_nacimiento")
         sesiones_enriquecidas.append(sesion)

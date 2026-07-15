@@ -33,7 +33,7 @@ SALIDA_SECRETA = QKeySequence(
 
 def _icono_fallback() -> QIcon:
     pix = QPixmap(32, 32)
-    pix.fill(QColor("#1a3c6e"))
+    pix.fill(QColor("#8B0E13"))
     return QIcon(pix)
 
 
@@ -155,7 +155,6 @@ class VentanaKiosko(QMainWindow):
             hora_inicio=ahora.isoformat(),
             carrera=estudiante.get("carrera") if estudiante else None,
             facultad=estudiante.get("facultad") if estudiante else None,
-            departamento=estudiante.get("departamento") if estudiante else None,
             sexo=estudiante.get("sexo") if estudiante else None,
             fecha_nacimiento=estudiante.get("fecha_nacimiento") if estudiante else None,
         )
@@ -197,7 +196,6 @@ class VentanaKiosko(QMainWindow):
                 hora_inicio=self._sesion_inicio.isoformat() if self._sesion_inicio else "",
                 carrera=datos.get("carrera"),
                 facultad=datos.get("facultad"),
-                departamento=datos.get("departamento"),
                 sexo=datos.get("sexo"),
                 fecha_nacimiento=datos.get("fecha_nacimiento"),
             )

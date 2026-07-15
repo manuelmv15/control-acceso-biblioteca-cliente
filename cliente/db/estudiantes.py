@@ -5,8 +5,8 @@ def guardar_estudiante_cache(est: dict):
     conn = get_connection()
     conn.execute("""
         INSERT OR REPLACE INTO estudiantes_cache
-            (carnet, nombre, carrera, facultad, departamento, fecha_nacimiento, sexo)
-        VALUES (:carnet, :nombre, :carrera, :facultad, :departamento, :fecha_nacimiento, :sexo)
+            (carnet, nombre, carrera, facultad, fecha_nacimiento, sexo)
+        VALUES (:carnet, :nombre, :carrera, :facultad, :fecha_nacimiento, :sexo)
     """, est)
     conn.commit()
     conn.close()

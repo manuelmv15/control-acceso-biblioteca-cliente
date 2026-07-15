@@ -72,9 +72,13 @@ class PantallaRegistro(QWidget):
         self.carnet.setPlaceholderText("Número de carnet")
         form.addRow("Carnet:", self.carnet)
 
-        self.fecha_nac = QLineEdit()
-        self.fecha_nac.setPlaceholderText("YYYY-MM-DD")
-        form.addRow("Fecha de nacimiento:", self.fecha_nac)
+        from datetime import date as _date
+        anio_actual = _date.today().year
+        self.fecha_nac = QComboBox()
+        self.fecha_nac.addItem("", None)
+        for anio in range(anio_actual - 15, anio_actual - 100, -1):
+            self.fecha_nac.addItem(str(anio), str(anio))
+        form.addRow("Año de nacimiento:", self.fecha_nac)
 
         self.carrera = QComboBox()
         self.carrera.addItems(CARRERAS)
@@ -83,10 +87,6 @@ class PantallaRegistro(QWidget):
         self.facultad = QComboBox()
         self.facultad.addItems(FACULTADES)
         form.addRow("Facultad:", self.facultad)
-
-        self.departamento = QLineEdit()
-        self.departamento.setPlaceholderText("Departamento")
-        form.addRow("Departamento:", self.departamento)
 
         sexo_row = QHBoxLayout()
         self.sexo_group = QButtonGroup(self)
@@ -123,14 +123,14 @@ class PantallaRegistro(QWidget):
         self.nombre.setText(datos.get("nombre", ""))
         self.carnet.setText(datos.get("carnet", ""))
         self.carnet.setReadOnly(True)
-        self.fecha_nac.setText(datos.get("fecha_nacimiento", "") or "")
+        idx = self.fecha_nac.findText(str(datos.get("fecha_nacimiento") or ""))
+        self.fecha_nac.setCurrentIndex(idx if idx >= 0 else 0)
         idx = self.carrera.findText(datos.get("carrera", ""))
         if idx >= 0:
             self.carrera.setCurrentIndex(idx)
         idx = self.facultad.findText(datos.get("facultad", ""))
         if idx >= 0:
             self.facultad.setCurrentIndex(idx)
-        self.departamento.setText(datos.get("departamento", "") or "")
         sexo = datos.get("sexo", "")
         for btn in self.sexo_group.buttons():
             if btn.property("valor") == sexo:
@@ -167,10 +167,9 @@ class PantallaRegistro(QWidget):
             "id": str(uuid.uuid4()),
             "nombre": nombre,
             "carnet": carnet,
-            "fecha_nacimiento": self.fecha_nac.text().strip() or None,
+            "fecha_nacimiento": self.fecha_nac.currentData(),
             "carrera": self.carrera.currentText(),
             "facultad": self.facultad.currentText(),
-            "departamento": self.departamento.text().strip() or None,
             "sexo": sexo,
             "fecha_registro": date.today().isoformat(),
         }
@@ -202,8 +201,7 @@ class PantallaRegistro(QWidget):
         self.carnet.setReadOnly(False)
         self.nombre.clear()
         self.carnet.clear()
-        self.fecha_nac.clear()
-        self.departamento.clear()
+        self.fecha_nac.setCurrentIndex(0)
         self.lbl_error.setText("")
         self.sexo_group.setExclusive(False)
         for btn in self.sexo_group.buttons():
