@@ -7,15 +7,14 @@ from network.hardware import enviar_hardware
 from hardware import collector, mantenimiento
 
 LOG_FILE = Path(__file__).parent.parent / "hardware.log"
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [HARDWARE] %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
-)
 log = logging.getLogger("hardware-agent")
+log.setLevel(logging.INFO)
+log.propagate = False
+if not log.handlers:
+    _formatter = logging.Formatter("%(asctime)s [HARDWARE] %(message)s")
+    for _handler in (logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler()):
+        _handler.setFormatter(_formatter)
+        log.addHandler(_handler)
 
 _wake = threading.Event()
 
