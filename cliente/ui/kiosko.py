@@ -74,9 +74,9 @@ class VentanaKiosko(QMainWindow):
 
         self.login.login_exitoso.connect(self._on_login)
         self.login.ir_registro.connect(lambda: self.stack.setCurrentIndex(PANTALLA_REGISTRO))
-        self.login.entrar_invitado.connect(self._on_login_invitado)
         self.registro.registro_exitoso.connect(self._on_login)
         self.registro.actualizacion_exitosa.connect(self._on_actualizacion_exitosa)
+        self.registro.acceso_no_estudiante.connect(self._on_login_no_estudiante)
         self.registro.cancelar.connect(self._on_cancelar_registro)
         self.bienvenida.cerrar_sesion.connect(self._on_cerrar_sesion)
 
@@ -131,9 +131,10 @@ class VentanaKiosko(QMainWindow):
 
     # ── Eventos de sesión ────────────────────────────────────────────────
 
-    def _on_login(self, estudiante: dict | None):
-        """estudiante=None representa una sesión de Invitado: sin carnet ni
-        datos personales, misma duración de sesión que un estudiante."""
+    def _on_login(self, estudiante: dict | None, etiqueta_sector: str = ""):
+        """estudiante=None representa un acceso sin registro (sector no
+        estudiantil): sin carnet ni datos personales, misma duración de
+        sesión que un estudiante."""
         ahora = now_sv()
         self._sesion_activa_id = str(uuid.uuid4())
         self._sesion_inicio = ahora
@@ -151,7 +152,7 @@ class VentanaKiosko(QMainWindow):
         })
         estado_mod.set_sesion_activa(
             carnet=carnet,
-            nombre=estudiante.get("nombre", "") if estudiante else "Invitado",
+            nombre=estudiante.get("nombre", "") if estudiante else etiqueta_sector,
             hora_inicio=ahora.isoformat(),
             carrera=estudiante.get("carrera") if estudiante else None,
             facultad=estudiante.get("facultad") if estudiante else None,
@@ -160,7 +161,7 @@ class VentanaKiosko(QMainWindow):
         )
 
         estudiante_mostrado = estudiante or {
-            "nombre": "Invitado", "carrera": "Sesión de invitado", "carnet": None,
+            "nombre": etiqueta_sector, "carrera": "Acceso sin registro", "carnet": None,
         }
         self.bienvenida.iniciar_sesion(estudiante_mostrado, ahora)
         self.stack.setCurrentIndex(PANTALLA_SESION)
@@ -171,8 +172,8 @@ class VentanaKiosko(QMainWindow):
 
         self._timer_sesion.start(DURACION_SESION_MS)
 
-    def _on_login_invitado(self):
-        self._on_login(None)
+    def _on_login_no_estudiante(self, sector: str):
+        self._on_login(None, etiqueta_sector=sector)
 
     def _on_cancelar_registro(self):
         self.registro._limpiar()
