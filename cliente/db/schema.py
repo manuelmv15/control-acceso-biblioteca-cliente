@@ -29,6 +29,20 @@ def _migrar_carnet_nullable(conn):
     conn.commit()
 
 
+def _migrar_estudiantes_pendientes(conn):
+    """estudiantes_cache no tenía forma de marcar un registro/actualización
+    hecho sin conexión como pendiente de reenviar al servidor."""
+    cols = conn.execute("PRAGMA table_info(estudiantes_cache)").fetchall()
+    if not cols:
+        return
+    nombres = {c["name"] for c in cols}
+    if "sincronizado" not in nombres:
+        conn.execute("ALTER TABLE estudiantes_cache ADD COLUMN sincronizado INTEGER NOT NULL DEFAULT 1")
+    if "pendiente_modo" not in nombres:
+        conn.execute("ALTER TABLE estudiantes_cache ADD COLUMN pendiente_modo TEXT")
+    conn.commit()
+
+
 def init_db():
     conn = get_connection()
     conn.executescript("""
@@ -49,7 +63,9 @@ def init_db():
             carrera TEXT,
             facultad TEXT,
             fecha_nacimiento TEXT,
-            sexo TEXT
+            sexo TEXT,
+            sincronizado INTEGER NOT NULL DEFAULT 1,
+            pendiente_modo TEXT
         );
 
         CREATE TABLE IF NOT EXISTS hardware_local (
@@ -62,4 +78,5 @@ def init_db():
     conn.commit()
 
     _migrar_carnet_nullable(conn)
+    _migrar_estudiantes_pendientes(conn)
     conn.close()

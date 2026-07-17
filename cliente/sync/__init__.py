@@ -4,9 +4,14 @@ from pathlib import Path
 
 from core.config import PC_ID, PC_NOMBRE, SYNC_INTERVAL, SERVER_URL
 from db.sesiones import obtener_pendientes, marcar_sincronizado
-from db.estudiantes import buscar_estudiante_cache
+from db.estudiantes import (
+    buscar_estudiante_cache,
+    obtener_estudiantes_pendientes,
+    marcar_estudiante_sincronizado,
+)
 from network.client import hay_conexion
 from network.sesiones import enviar_sesiones, enviar_estado
+from network.estudiantes import registrar_estudiante, actualizar_estudiante
 import core.estado as estado_mod
 
 LOG_FILE = Path(__file__).parent.parent / "sync.log"
@@ -22,10 +27,31 @@ if not log.handlers:
 _wake = threading.Event()
 
 
+def _sincronizar_estudiantes_pendientes():
+    """Reenvía al servidor los registros/actualizaciones de estudiantes que
+    se guardaron localmente sin conexión (ver ui/registro.py)."""
+    pendientes = obtener_estudiantes_pendientes()
+    if not pendientes:
+        return
+    sincronizados = 0
+    for est in pendientes:
+        modo = est.get("pendiente_modo") or "crear"
+        if modo == "actualizar":
+            ok = actualizar_estudiante(est["carnet"], est) or registrar_estudiante(est)
+        else:
+            ok = registrar_estudiante(est)
+        if ok:
+            marcar_estudiante_sincronizado(est["carnet"])
+            sincronizados += 1
+    log.info(f"Estudiantes pendientes: {sincronizados}/{len(pendientes)} sincronizados")
+
+
 def _ejecutar_ciclo():
     if not hay_conexion():
         log.info("Sin conexión — skip")
         return
+
+    _sincronizar_estudiantes_pendientes()
 
     estado_actual = estado_mod.get_estado()
     enviar_estado({

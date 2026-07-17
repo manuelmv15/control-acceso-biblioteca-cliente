@@ -340,7 +340,7 @@ class PantallaRegistro(QWidget):
             "fecha_registro": date.today().isoformat(),
         }
 
-        guardar_estudiante_cache({**datos, "nombre": nombre})
+        modo_pendiente = "actualizar" if self._modo_actualizacion else "crear"
 
         if hay_conexion():
             if self._modo_actualizacion:
@@ -348,9 +348,13 @@ class PantallaRegistro(QWidget):
                 ok = actualizar_estudiante(carnet, datos)
             else:
                 ok = registrar_estudiante(datos)
-            if not ok:
-                self.lbl_error.setText("Error al enviar al servidor — guardado localmente")
+            if ok:
+                guardar_estudiante_cache({**datos, "nombre": nombre})
+            else:
+                guardar_estudiante_cache({**datos, "nombre": nombre}, sincronizado=0, pendiente_modo=modo_pendiente)
+                self.lbl_error.setText("Error al enviar al servidor — guardado localmente, se reintentará")
         else:
+            guardar_estudiante_cache({**datos, "nombre": nombre}, sincronizado=0, pendiente_modo=modo_pendiente)
             self.lbl_error.setText("Sin internet — guardado localmente, se sincronizará después")
 
         modo = self._modo_actualizacion
