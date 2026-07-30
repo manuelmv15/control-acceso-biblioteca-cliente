@@ -1,9 +1,12 @@
+import hashlib
+import hmac
 import uuid
 from datetime import date, datetime
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QStackedWidget, QApplication, QSystemTrayIcon, QMenu
+    QMainWindow, QStackedWidget, QApplication, QSystemTrayIcon, QMenu,
+    QInputDialog, QLineEdit, QMessageBox
 )
 from PyQt6.QtCore import Qt, QTimer, QKeyCombination
 from PyQt6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap, QColor
@@ -13,7 +16,7 @@ from ui.registro import PantallaRegistro
 from ui.bienvenida import PantallaBienvenida
 from ui.flotante import WidgetFlotatante
 from db.sesiones import guardar_sesion, actualizar_hora_fin
-from core.config import PC_ID, DURACION_SESION_MS, now_sv
+from core.config import PC_ID, DURACION_SESION_MS, ADMIN_PIN_HASH, now_sv
 from sync import forzar_sync
 import core.estado as estado_mod
 
@@ -246,11 +249,32 @@ class VentanaKiosko(QMainWindow):
         self._mostrar_login()
 
     def _salida_admin(self):
+        if not self._verificar_pin_admin():
+            return
         if self._sesion_activa_id:
             actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
         self._timer_sesion.stop()
         self.tray.hide()
         QApplication.quit()
+
+    def _verificar_pin_admin(self) -> bool:
+        if not ADMIN_PIN_HASH:
+            QMessageBox.warning(
+                self, "Salida bloqueada",
+                "No hay un PIN de administrador configurado en config.ini "
+                "([admin] pin_hash). Configúralo antes de poder salir del kiosko."
+            )
+            return False
+        pin, ok = QInputDialog.getText(
+            self, "Salida de administrador", "PIN de administrador:",
+            QLineEdit.EchoMode.Password
+        )
+        if not ok:
+            return False
+        if hmac.compare_digest(hashlib.sha256(pin.encode()).hexdigest(), ADMIN_PIN_HASH):
+            return True
+        QMessageBox.warning(self, "PIN incorrecto", "El PIN ingresado no es válido.")
+        return False
 
     def closeEvent(self, event):
         # X oculta a tray en lugar de cerrar

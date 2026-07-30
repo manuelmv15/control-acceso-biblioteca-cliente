@@ -1,5 +1,7 @@
 """Script de configuración inicial — ejecutar una vez por PC hija."""
 import configparser
+import getpass
+import hashlib
 import uuid
 import sys
 import os
@@ -51,11 +53,14 @@ def main():
     nombre = preguntar("Nombre de esta PC (ej: PC-01)", "PC-01")
     server_url = preguntar("URL del servidor", "http://localhost:8000")
     kiosk_key = preguntar("API key de kiosko (la misma KIOSK_API_KEY del servidor)", "")
+    admin_pin = getpass.getpass("PIN de administrador para 'Salir (admin)' del kiosko (no se muestra en pantalla): ").strip()
+    admin_pin_hash = hashlib.sha256(admin_pin.encode()).hexdigest() if admin_pin else ""
 
     config = configparser.ConfigParser()
     config["pc"] = {"nombre": nombre}
     config["servidor"] = {"url": server_url, "kiosk_key": kiosk_key}
     config["sync"] = {"intervalo_segundos": "30"}
+    config["admin"] = {"pin_hash": admin_pin_hash}
 
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         config.write(f)
@@ -81,6 +86,8 @@ def main():
     print(f"  Servidor: {server_url}")
     if not kiosk_key:
         print("  ⚠️  Sin API key de kiosko: el login/registro de estudiantes fallará (401) hasta que la configures en config.ini")
+    if not admin_pin_hash:
+        print("  ⚠️  Sin PIN de administrador: 'Salir (admin)' quedará bloqueado hasta que configures [admin] pin_hash en config.ini")
     print(f"\nEjecutar: python main.py")
 
 

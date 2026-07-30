@@ -51,7 +51,7 @@ cliente/
 4. **Registro** (`ui/registro.py`): formulario con nombre, carnet, año de nacimiento, sector (Estudiante/Administrativo/Docente/Visitante), sede, facultad/departamento y carrera (listas en cascada), y género. Si el sector no es "Estudiante", no se piden datos personales y se otorga acceso anónimo (modo invitado, sesión sin carnet). Si hay datos de estudiante, se valida duplicado e intenta enviarse al servidor (`POST`/`PUT /estudiantes`); si falla o no hay red, se guarda localmente marcado como pendiente de sincronizar.
 5. **Sesión iniciada**: se genera un `uuid4` como id de sesión, se guarda en `sesiones_pendientes` local, se muestra una pantalla de bienvenida (`ui/bienvenida.py`, ~3s) y luego la ventana se oculta a la bandeja mostrando un **widget flotante** (`ui/flotante.py`) — un botón circular expandible con el tiempo restante, botón de "Actualizar mis datos" (oculto para invitados) y "Cerrar sesión". Arranca un temporizador de duración de sesión configurable.
 6. **Cierre de sesión**: manual o por expiración automática. En ambos casos se registra `hora_fin`, se limpia el estado en memoria, se fuerza una sincronización inmediata (sin esperar el intervalo periódico), y se vuelve a mostrar el login en pantalla completa.
-7. **Salida administrativa**: solo posible con el atajo secreto o el ítem "Salir (admin)" del menú de bandeja — cierra cualquier sesión activa y termina la aplicación. El botón de cerrar normal del sistema operativo está interceptado: solo oculta la ventana a la bandeja, nunca cierra la app (comportamiento de kiosko real).
+7. **Salida administrativa**: solo posible con el atajo secreto o el ítem "Salir (admin)" del menú de bandeja, y ambos exigen ingresar el PIN de administrador (hash SHA-256 comparado con `hmac.compare_digest` contra `[admin] pin_hash` en `config.ini`) antes de cerrar cualquier sesión activa y terminar la aplicación. Si no hay PIN configurado, la salida queda bloqueada (falla cerrado, no hay bypass por defecto). El botón de cerrar normal del sistema operativo está interceptado: solo oculta la ventana a la bandeja, nunca cierra la app (comportamiento de kiosko real).
 
 ## Modelo de datos local (`db/schema.py`)
 
@@ -102,7 +102,7 @@ Loguea todo en `sync.log`. Expone `forzar_sync()`, invocado tras login, logout o
 ## Configuración
 
 ### `setup.py` — configuración inicial (una vez por PC)
-Pide nombre de PC (default `PC-01`) y URL del servidor (default `http://localhost:8000`), escribe `config.ini`, genera (o reutiliza) `.pc_id`, inicializa la base de datos local, y ofrece instalar el autostart.
+Pide nombre de PC (default `PC-01`), URL del servidor (default `http://localhost:8000`), la API key de kiosko (`KIOSK_API_KEY` compartida con el servidor) y un PIN de administrador para "Salir (admin)" (se pide oculto con `getpass` y se guarda como hash SHA-256, nunca en texto plano); escribe `config.ini`, genera (o reutiliza) `.pc_id`, inicializa la base de datos local, y ofrece instalar el autostart. Si se deja el PIN vacío, avisa que la salida administrativa quedará bloqueada hasta configurarlo.
 
 ```bash
 cd cliente
@@ -111,11 +111,13 @@ python setup.py
 ```
 
 ### `core/config.py` — carga de configuración
-Lee `config.ini` (secciones `[pc]`, `[servidor]`, `[sync]`) y permite **override por variable de entorno** en cada valor:
+Lee `config.ini` (secciones `[pc]`, `[servidor]`, `[sync]`, `[admin]`) y permite **override por variable de entorno** en cada valor:
 
 | Variable | Fuente en `config.ini` | Variable de entorno | Default |
 |---|---|---|---|
 | `SERVER_URL` | `[servidor] url` | `BIBLIOTECA_SERVER_URL` | `http://localhost:8000` |
+| `KIOSK_API_KEY` | `[servidor] kiosk_key` | `BIBLIOTECA_KIOSK_KEY` | `""` (vacío → login/registro fallará con 401) |
+| `ADMIN_PIN_HASH` | `[admin] pin_hash` | `BIBLIOTECA_ADMIN_PIN_HASH` | `""` (vacío → "Salir (admin)" queda bloqueado) |
 | `PC_ID` | archivo `.pc_id` | — (solo por archivo) | uuid4 generado |
 | `PC_NOMBRE` | `[pc] nombre` | `BIBLIOTECA_PC_NOMBRE` | `PC-00` |
 | `SYNC_INTERVAL` | `[sync] intervalo_segundos` | — | 30 |

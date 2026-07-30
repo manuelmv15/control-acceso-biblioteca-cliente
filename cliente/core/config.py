@@ -38,6 +38,7 @@ def _load_pc_id() -> str:
 
 SERVER_URL: str = _get("servidor", "url", "BIBLIOTECA_SERVER_URL", "http://localhost:8000")
 KIOSK_API_KEY: str = _get("servidor", "kiosk_key", "BIBLIOTECA_KIOSK_KEY", "")
+ADMIN_PIN_HASH: str = _get("admin", "pin_hash", "BIBLIOTECA_ADMIN_PIN_HASH", "")
 PC_ID: str = _load_pc_id()
 PC_NOMBRE: str = _get("pc", "nombre", "BIBLIOTECA_PC_NOMBRE", "PC-00")
 SYNC_INTERVAL: int = int(_get("sync", "intervalo_segundos", default="30"))
