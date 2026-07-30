@@ -50,10 +50,11 @@ def main():
 
     nombre = preguntar("Nombre de esta PC (ej: PC-01)", "PC-01")
     server_url = preguntar("URL del servidor", "http://localhost:8000")
+    kiosk_key = preguntar("API key de kiosko (la misma KIOSK_API_KEY del servidor)", "")
 
     config = configparser.ConfigParser()
     config["pc"] = {"nombre": nombre}
-    config["servidor"] = {"url": server_url}
+    config["servidor"] = {"url": server_url, "kiosk_key": kiosk_key}
     config["sync"] = {"intervalo_segundos": "30"}
 
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -78,6 +79,8 @@ def main():
     print(f"  PC: {nombre}")
     print(f"  ID: {pc_id}")
     print(f"  Servidor: {server_url}")
+    if not kiosk_key:
+        print("  ⚠️  Sin API key de kiosko: el login/registro de estudiantes fallará (401) hasta que la configures en config.ini")
     print(f"\nEjecutar: python main.py")
 
 
