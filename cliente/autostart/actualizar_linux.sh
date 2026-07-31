@@ -7,6 +7,9 @@ REPO_DIR="$(cd "$APP_DIR/.." && pwd)"
 PYTHON="${PYTHON:-python3}"
 SERVICE_NAME="biblioteca-kiosko"
 
+PIP_ERROR_LOG="$(mktemp)"
+trap 'rm -f "$PIP_ERROR_LOG"' EXIT
+
 echo "=== Actualizando Biblioteca Kiosko ==="
 
 if [[ ! -d "$REPO_DIR/.git" ]]; then
@@ -40,18 +43,16 @@ fi
 
 echo ""
 echo "Actualizando dependencias..."
-if ! "$PYTHON" -m pip install -q -r "$APP_DIR/requirements.txt" 2>/tmp/pip-error-$$; then
-    if grep -q "externally-managed-environment" /tmp/pip-error-$$; then
+if ! "$PYTHON" -m pip install -q -r "$APP_DIR/requirements.txt" 2>"$PIP_ERROR_LOG"; then
+    if grep -q "externally-managed-environment" "$PIP_ERROR_LOG"; then
         echo "El entorno de Python es externally-managed (PEP 668) — reintentando con --break-system-packages."
         echo "Esta PC es de uso dedicado para el kiosko, así que instalar en el Python del sistema es seguro."
         "$PYTHON" -m pip install -q --break-system-packages -r "$APP_DIR/requirements.txt"
     else
-        cat /tmp/pip-error-$$ >&2
-        rm -f /tmp/pip-error-$$
+        cat "$PIP_ERROR_LOG" >&2
         exit 1
     fi
 fi
-rm -f /tmp/pip-error-$$
 
 echo ""
 if systemctl is-enabled "$SERVICE_NAME" &>/dev/null; then
