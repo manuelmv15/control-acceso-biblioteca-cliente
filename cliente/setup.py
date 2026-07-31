@@ -6,6 +6,7 @@ import uuid
 import sys
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "config.ini"
@@ -18,6 +19,23 @@ def preguntar(prompt: str, default: str = "") -> str:
         return respuesta or default
     respuesta = input(f"{prompt}: ").strip()
     return respuesta
+
+
+def preguntar_server_url() -> str:
+    """PII de estudiantes y telemetría de hardware viajan en cada request a
+    esta URL; sin TLS, cualquiera en la misma LAN puede leerlas/alterarlas.
+    Solo se acepta http:// hacia localhost (desarrollo)."""
+    while True:
+        url = preguntar("URL del servidor", "http://localhost:8000")
+        host = urlparse(url).hostname
+        if urlparse(url).scheme == "http" and host not in ("localhost", "127.0.0.1"):
+            print(
+                f"  ⚠️  '{url}' usa http:// hacia un host que no es localhost: la PII de "
+                f"estudiantes viajaría en texto plano por la red. Usa https:// (o "
+                f"localhost/127.0.0.1 solo para desarrollo)."
+            )
+            continue
+        return url
 
 
 def generar_pc_id() -> str:
@@ -51,7 +69,7 @@ def main():
     print("=== Configuración de PC Biblioteca ===\n")
 
     nombre = preguntar("Nombre de esta PC (ej: PC-01)", "PC-01")
-    server_url = preguntar("URL del servidor", "http://localhost:8000")
+    server_url = preguntar_server_url()
     kiosk_key = preguntar("API key de kiosko (la misma KIOSK_API_KEY del servidor)", "")
     admin_pin = getpass.getpass("PIN de administrador para 'Salir (admin)' del kiosko (no se muestra en pantalla): ").strip()
     admin_pin_hash = hashlib.sha256(admin_pin.encode()).hexdigest() if admin_pin else ""
