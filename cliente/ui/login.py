@@ -5,6 +5,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from pathlib import Path
 
+from ui.log import log
+
 
 class PantallaLogin(QWidget):
     login_exitoso = pyqtSignal(dict)
@@ -96,10 +98,12 @@ class PantallaLogin(QWidget):
                 })
 
         if est:
+            log.info("Login OK — carnet %s", carnet)
             self.lbl_error.setText("")
             self.carnet_input.clear()
             self.login_exitoso.emit(est)
         else:
+            log.info("Login fallido — carnet %s no encontrado", carnet)
             self.lbl_error.setText("Carnet no encontrado. ¿Es su primera vez? Regístrese.")
 
     def limpiar(self):

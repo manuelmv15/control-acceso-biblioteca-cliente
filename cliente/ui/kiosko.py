@@ -19,6 +19,7 @@ from db.sesiones import guardar_sesion, actualizar_hora_fin
 from core.config import PC_ID, DURACION_SESION_MS, ADMIN_PIN_HASH, now_sv
 from sync import forzar_sync
 import core.estado as estado_mod
+from ui.log import log
 
 PANTALLA_LOGIN = 0
 PANTALLA_REGISTRO = 1
@@ -145,6 +146,10 @@ class VentanaKiosko(QMainWindow):
         self._es_invitado = estudiante is None
 
         carnet = estudiante["carnet"] if estudiante else None
+        if carnet:
+            log.info("Sesión iniciada — carnet %s", carnet)
+        else:
+            log.info("Sesión iniciada — invitado (%s)", etiqueta_sector or "sin sector")
         guardar_sesion({
             "id": self._sesion_activa_id,
             "pc_id": PC_ID,
@@ -251,6 +256,7 @@ class VentanaKiosko(QMainWindow):
     def _salida_admin(self):
         if not self._verificar_pin_admin():
             return
+        log.info("Kiosko cerrado vía Salir (admin)")
         if self._sesion_activa_id:
             actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
         self._timer_sesion.stop()
@@ -259,6 +265,7 @@ class VentanaKiosko(QMainWindow):
 
     def _verificar_pin_admin(self) -> bool:
         if not ADMIN_PIN_HASH:
+            log.warning("Salida admin bloqueada: sin PIN configurado")
             QMessageBox.warning(
                 self, "Salida bloqueada",
                 "No hay un PIN de administrador configurado en config.ini "
@@ -272,7 +279,9 @@ class VentanaKiosko(QMainWindow):
         if not ok:
             return False
         if hmac.compare_digest(hashlib.sha256(pin.encode()).hexdigest(), ADMIN_PIN_HASH):
+            log.info("Salida admin autorizada (PIN correcto)")
             return True
+        log.warning("Salida admin denegada: PIN incorrecto")
         QMessageBox.warning(self, "PIN incorrecto", "El PIN ingresado no es válido.")
         return False
 
