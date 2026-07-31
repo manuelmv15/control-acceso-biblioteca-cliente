@@ -55,9 +55,19 @@ rm -f /tmp/pip-error-$$
 
 echo ""
 if systemctl is-enabled "$SERVICE_NAME" &>/dev/null; then
-    echo "Reiniciando servicio systemd..."
-    sudo systemctl restart "$SERVICE_NAME"
-    echo "Servicio reiniciado con la nueva versión."
+    if [[ -t 0 ]]; then
+        read -r -p "¿Reiniciar el servicio ahora para aplicar los cambios? (s/n) " RESPUESTA
+    else
+        RESPUESTA="n"
+        echo "Ejecución sin terminal (p. ej. cron) — no se reinicia automáticamente."
+    fi
+    if [[ "$RESPUESTA" == "s" || "$RESPUESTA" == "S" ]]; then
+        echo "Reiniciando servicio systemd..."
+        sudo systemctl restart "$SERVICE_NAME"
+        echo "Servicio reiniciado con la nueva versión."
+    else
+        echo "Reinicio pendiente. Ejecuta 'sudo systemctl restart $SERVICE_NAME' cuando quieras aplicar los cambios."
+    fi
 elif pgrep -f "$APP_DIR/main.py" &>/dev/null; then
     echo "AVISO: la app está corriendo vía autostart de sesión (sin systemd)."
     echo "Cierra la app y vuelve a abrirla (o reinicia sesión) para aplicar los cambios."
