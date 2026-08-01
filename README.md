@@ -143,6 +143,32 @@ También define `TZ_SV = ZoneInfo("America/El_Salvador")` y `now_sv()`, usados e
 - **Logs**: `sync.log` y `hardware.log`, ambos regenerables (no versionados en git), limpiados por `desinstalar_linux.sh`.
 - Los estilos y el catálogo de sedes/facultades/carreras en `ui/registro.py` replican la identidad visual y la oferta académica real de la UES (Facultad Multidisciplinaria de Oriente).
 
+## Mapa del código (`.codebase-memory/`)
+
+El repo mantiene un **grafo de conocimiento del código** (funciones, clases, archivos, imports, llamadas entre símbolos) indexado con `codebase-memory-mcp`, más un dashboard HTML que lo visualiza. Sirve para explorar la arquitectura real del proyecto (quién llama a quién, qué archivos concentran más lógica, etc.) sin tener que leer todo el código.
+
+```
+.codebase-memory/
+├── graph.db.zst              # snapshot comprimido del grafo (nodos + aristas), para compartir sin reindexar
+├── artifact.json              # metadata del último snapshot: commit, fecha, nº de nodos/aristas, tamaño
+├── generate_dashboard.py     # script generador del dashboard (lee la DB del grafo, escribe dashboard.html)
+├── dashboard.template.html    # plantilla del dashboard (CSS/JS embebido, no cambia entre regeneraciones)
+└── dashboard.html             # dashboard generado — no versionado, se regenera solo
+```
+
+### Ver el dashboard
+Abre `.codebase-memory/dashboard.html` directamente en el navegador (doble clic). Muestra nodos/aristas por tipo, los archivos con más símbolos, las funciones/métodos más conectados (fan-in/fan-out) y un explorador de símbolos con búsqueda y filtros.
+
+### (Re)indexar el proyecto
+El índice se genera con la herramienta MCP `codebase-memory-mcp` (`index_repository`), normalmente invocada por Claude Code al explorar o modificar el código. Para forzar una reindexación completa manualmente, pídeselo a Claude ("indexa el proyecto de nuevo") o usa la skill `codebase-memory`.
+
+### Actualización automática del dashboard
+Hay un hook (`PostToolUse`) configurado en `.claude/settings.json` que, tras cada reindexación, corre `generate_dashboard.py` automáticamente para que `dashboard.html` siempre refleje el último estado del código. Para regenerarlo a mano en cualquier momento:
+
+```bash
+python3 .codebase-memory/generate_dashboard.py
+```
+
 ## Requisitos previos
 
 - Python 3.x con PyQt6 disponible (en Linux, puede requerir paquetes del sistema para Qt según la distro).
