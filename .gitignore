@@ -51,3 +51,8 @@ docs/
 
 # Entorno de prueba Docker para cliente/ (no es parte de la app ni del despliegue)
 cliente/docker/
+
+# Dashboard de codebase-memory: se regenera solo (script/plantilla sí se versionan)
+.codebase-memory/
+.claude/
+
