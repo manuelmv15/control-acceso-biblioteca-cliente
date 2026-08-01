@@ -6,7 +6,6 @@ import uuid
 import sys
 import os
 from pathlib import Path
-from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "config.ini"
@@ -22,20 +21,7 @@ def preguntar(prompt: str, default: str = "") -> str:
 
 
 def preguntar_server_url() -> str:
-    """PII de estudiantes y telemetría de hardware viajan en cada request a
-    esta URL; sin TLS, cualquiera en la misma LAN puede leerlas/alterarlas.
-    Solo se acepta http:// hacia localhost (desarrollo)."""
-    while True:
-        url = preguntar("URL del servidor", "http://localhost:8000")
-        host = urlparse(url).hostname
-        if urlparse(url).scheme == "http" and host not in ("localhost", "127.0.0.1"):
-            print(
-                f"  ⚠️  '{url}' usa http:// hacia un host que no es localhost: la PII de "
-                f"estudiantes viajaría en texto plano por la red. Usa https:// (o "
-                f"localhost/127.0.0.1 solo para desarrollo)."
-            )
-            continue
-        return url
+    return preguntar("URL del servidor", "http://localhost:8000")
 
 
 def generar_pc_id() -> str:
