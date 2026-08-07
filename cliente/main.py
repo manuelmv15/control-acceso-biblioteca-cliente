@@ -15,6 +15,12 @@ def main():
 
     app = QApplication(sys.argv)
     app.setWindowIcon(cargar_icono_app())
+    # Identifica la app ante el entorno de escritorio (GNOME/Wayland en las
+    # PCs cliente) para que el dock/barra de apps use el ícono del
+    # .desktop instalado por autostart/instalar_linux.sh en vez del
+    # genérico. Debe coincidir con el nombre de ese .desktop (sin
+    # extensión) y con su StartupWMClass.
+    app.setDesktopFileName("biblioteca-kiosko")
 
     ventana = VentanaKiosko()
     ventana.show()

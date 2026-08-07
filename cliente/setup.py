@@ -2,6 +2,7 @@
 import configparser
 import getpass
 import hashlib
+import subprocess
 import uuid
 import sys
 import os
@@ -36,19 +37,46 @@ def generar_pc_id() -> str:
 
 
 def instalar_autostart_linux(app_path: str):
+    python = sys.executable
+    icon = BASE_DIR / "assets" / "logo.png"
+
     desktop_dir = Path.home() / ".config" / "autostart"
     desktop_dir.mkdir(parents=True, exist_ok=True)
     desktop_file = desktop_dir / "biblioteca-kiosko.desktop"
-    python = sys.executable
     desktop_file.write_text(f"""[Desktop Entry]
 Type=Application
 Name=Biblioteca Kiosko
 Exec={python} {app_path}
+Icon={icon}
+StartupWMClass=biblioteca-kiosko
 X-GNOME-Autostart-enabled=true
 NoDisplay=false
 Hidden=false
 """)
     print(f"  Autostart creado: {desktop_file}")
+
+    # Entrada del menú de aplicaciones: es la que el dock/barra de apps del
+    # entorno de escritorio (GNOME, etc.) usa para el ícono, no la de
+    # autostart de arriba (esa solo controla el arranque de sesión).
+    # main.py llama a app.setDesktopFileName("biblioteca-kiosko"), que debe
+    # coincidir con el nombre de este archivo (sin ".desktop").
+    apps_dir = Path.home() / ".local" / "share" / "applications"
+    apps_dir.mkdir(parents=True, exist_ok=True)
+    apps_desktop_file = apps_dir / "biblioteca-kiosko.desktop"
+    apps_desktop_file.write_text(f"""[Desktop Entry]
+Type=Application
+Name=Biblioteca Kiosko
+Exec={python} {app_path}
+Icon={icon}
+StartupWMClass=biblioteca-kiosko
+Terminal=false
+Categories=Utility;
+""")
+    print(f"  Entrada de aplicación creada: {apps_desktop_file}")
+    subprocess.run(
+        ["update-desktop-database", str(apps_dir)],
+        capture_output=True, check=False,
+    )
 
 
 def main():

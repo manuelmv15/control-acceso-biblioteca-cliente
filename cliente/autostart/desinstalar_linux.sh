@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
 AUTOSTART_DIR="$HOME/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DIR/biblioteca-kiosko.desktop"
+APPS_DIR="$HOME/.local/share/applications"
+APPS_DESKTOP_FILE="$APPS_DIR/biblioteca-kiosko.desktop"
 SERVICE_NAME="biblioteca-kiosko"
 SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
 
@@ -36,6 +38,17 @@ if [[ -f "$DESKTOP_FILE" ]]; then
     echo "Autostart de sesión eliminado: $DESKTOP_FILE"
 else
     echo "No había autostart de sesión instalado."
+fi
+
+# Entrada del menú de aplicaciones (ícono del dock/barra de apps)
+if [[ -f "$APPS_DESKTOP_FILE" ]]; then
+    rm -f "$APPS_DESKTOP_FILE"
+    echo "Entrada de aplicación eliminada: $APPS_DESKTOP_FILE"
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$APPS_DIR" 2>/dev/null || true
+    fi
+else
+    echo "No había entrada de aplicación instalada."
 fi
 
 # Servicio systemd
