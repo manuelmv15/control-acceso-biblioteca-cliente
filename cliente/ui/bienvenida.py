@@ -1,14 +1,12 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QSpacerItem, QSizePolicy
+    QWidget, QVBoxLayout, QLabel, QSpacerItem, QSizePolicy
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QTimer
 from datetime import datetime
 from core.config import now_sv
 
 
 class PantallaBienvenida(QWidget):
-    cerrar_sesion = pyqtSignal()
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self._sesion_inicio = None
@@ -55,13 +53,6 @@ class PantallaBienvenida(QWidget):
         layout.addWidget(self.lbl_hora_inicio)
 
         layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-        btn = QPushButton("Cerrar Sesión")
-        btn.setObjectName("btn-cerrar-sesion")
-        btn.clicked.connect(self.cerrar_sesion)
-        layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        layout.addSpacerItem(QSpacerItem(0, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
     def iniciar_sesion(self, estudiante: dict, hora_inicio: datetime):
         self._sesion_inicio = hora_inicio

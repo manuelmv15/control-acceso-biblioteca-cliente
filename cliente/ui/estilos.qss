@@ -130,38 +130,3 @@ QFrame#separador {
     max-height: 1px;
     margin: 8px 0;
 }
-
-/* ── Widget flotante ── */
-
-QPushButton#flotante-btn {
-    background-color: #8B0E13;
-    color: #ffffff;
-    border-radius: 28px;
-    font-size: 22px;
-    padding: 0;
-    min-width: 56px;
-    min-height: 56px;
-}
-
-QPushButton#flotante-btn:hover { background-color: #1A171B; }
-QPushButton#flotante-btn:pressed { background-color: #000000; }
-
-QWidget#flotante-panel {
-    background-color: #ffffff;
-    border: 1px solid #EEEEEE;
-    border-radius: 10px;
-    min-width: 200px;
-}
-
-QLabel#flotante-titulo {
-    font-size: 13px;
-    color: #696969;
-    padding: 0;
-}
-
-QLabel#flotante-timer {
-    font-size: 28px;
-    font-weight: bold;
-    color: #8B0E13;
-    letter-spacing: 2px;
-}

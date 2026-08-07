@@ -14,7 +14,7 @@ from PyQt6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap, QColor
 from ui.login import PantallaLogin
 from ui.registro import PantallaRegistro
 from ui.bienvenida import PantallaBienvenida
-from ui.flotante import WidgetFlotatante
+from ui.sesion import VentanaSesion
 from db.sesiones import guardar_sesion, actualizar_hora_fin
 from core.config import PC_ID, DURACION_SESION_MS, ADMIN_PIN_HASH, now_sv
 from sync import forzar_sync
@@ -47,6 +47,7 @@ class VentanaKiosko(QMainWindow):
         self._sesion_activa_id: str | None = None
         self._sesion_inicio: datetime | None = None
         self._estudiante_activo: dict | None = None
+        self._estudiante_mostrado: dict | None = None
         self._es_invitado: bool = False
 
         self._timer_sesion = QTimer(self)
@@ -82,11 +83,10 @@ class VentanaKiosko(QMainWindow):
         self.registro.actualizacion_exitosa.connect(self._on_actualizacion_exitosa)
         self.registro.acceso_no_estudiante.connect(self._on_login_no_estudiante)
         self.registro.cancelar.connect(self._on_cancelar_registro)
-        self.bienvenida.cerrar_sesion.connect(self._on_cerrar_sesion)
 
-        self.flotante = WidgetFlotatante()
-        self.flotante.cerrar_sesion.connect(self._on_cerrar_sesion)
-        self.flotante.actualizar_datos.connect(self._on_actualizar_datos)
+        self.ventana_sesion = VentanaSesion()
+        self.ventana_sesion.cerrar_sesion.connect(self._on_cerrar_sesion)
+        self.ventana_sesion.actualizar_datos.connect(self._on_actualizar_datos)
 
     def _configurar_tray(self):
         logo = Path(__file__).parent.parent / "assets" / "logo.png"
@@ -131,7 +131,9 @@ class VentanaKiosko(QMainWindow):
             QSystemTrayIcon.MessageIcon.Information,
             4000,
         )
-        self.flotante.iniciar_sesion(self._sesion_inicio, DURACION_SESION_MS, self._es_invitado)
+        self.ventana_sesion.iniciar_sesion(
+            self._estudiante_mostrado, self._sesion_inicio, DURACION_SESION_MS, self._es_invitado
+        )
 
     # ── Eventos de sesión ────────────────────────────────────────────────
 
@@ -168,10 +170,10 @@ class VentanaKiosko(QMainWindow):
             fecha_nacimiento=estudiante.get("fecha_nacimiento") if estudiante else None,
         )
 
-        estudiante_mostrado = estudiante or {
+        self._estudiante_mostrado = estudiante or {
             "nombre": etiqueta_sector, "carrera": "Acceso sin registro", "carnet": None,
         }
-        self.bienvenida.iniciar_sesion(estudiante_mostrado, ahora)
+        self.bienvenida.iniciar_sesion(self._estudiante_mostrado, ahora)
         self.stack.setCurrentIndex(PANTALLA_SESION)
         self.showFullScreen()
 
@@ -198,6 +200,8 @@ class VentanaKiosko(QMainWindow):
 
     def _on_actualizacion_exitosa(self, datos: dict):
         self._estudiante_activo = datos
+        self._estudiante_mostrado = datos
+        self.ventana_sesion.actualizar_estudiante(datos)
         if self._sesion_activa_id:
             estado_mod.set_sesion_activa(
                 carnet=datos["carnet"],
@@ -225,11 +229,12 @@ class VentanaKiosko(QMainWindow):
             self._sesion_activa_id = None
             self._sesion_inicio = None
         self._estudiante_activo = None
+        self._estudiante_mostrado = None
         self._es_invitado = False
         estado_mod.set_sesion_inactiva()
         forzar_sync()
 
-        self.flotante.detener()
+        self.ventana_sesion.detener()
         self.bienvenida.detener()
         self._mostrar_login()
 
@@ -239,11 +244,12 @@ class VentanaKiosko(QMainWindow):
         self._sesion_activa_id = None
         self._sesion_inicio = None
         self._estudiante_activo = None
+        self._estudiante_mostrado = None
         self._es_invitado = False
         estado_mod.set_sesion_inactiva()
         forzar_sync()
 
-        self.flotante.detener()
+        self.ventana_sesion.detener()
         self.bienvenida.detener()
         self.tray.showMessage(
             "Biblioteca",
