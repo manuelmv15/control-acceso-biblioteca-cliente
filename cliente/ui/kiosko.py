@@ -9,12 +9,13 @@ from PyQt6.QtWidgets import (
     QInputDialog, QLineEdit, QMessageBox
 )
 from PyQt6.QtCore import Qt, QTimer, QKeyCombination
-from PyQt6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap, QColor
+from PyQt6.QtGui import QKeySequence, QShortcut
 
 from ui.login import PantallaLogin
 from ui.registro import PantallaRegistro
 from ui.bienvenida import PantallaBienvenida
 from ui.sesion import VentanaSesion
+from ui.icono import cargar_icono_app
 from db.sesiones import guardar_sesion, actualizar_hora_fin
 from core.config import PC_ID, DURACION_SESION_MS, ADMIN_PIN_HASH, now_sv
 from sync import forzar_sync
@@ -35,12 +36,6 @@ SALIDA_SECRETA = QKeySequence(
 )
 
 
-def _icono_fallback() -> QIcon:
-    pix = QPixmap(32, 32)
-    pix.fill(QColor("#8B0E13"))
-    return QIcon(pix)
-
-
 class VentanaKiosko(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -54,6 +49,7 @@ class VentanaKiosko(QMainWindow):
         self._timer_sesion.setSingleShot(True)
         self._timer_sesion.timeout.connect(self._sesion_expirada)
 
+        self.setWindowIcon(cargar_icono_app())
         self._cargar_estilos()
         self._construir_ui()
         self._configurar_tray()
@@ -89,10 +85,7 @@ class VentanaKiosko(QMainWindow):
         self.ventana_sesion.actualizar_datos.connect(self._on_actualizar_datos)
 
     def _configurar_tray(self):
-        logo = Path(__file__).parent.parent / "assets" / "logo.png"
-        icono = QIcon(str(logo)) if logo.exists() else _icono_fallback()
-
-        self.tray = QSystemTrayIcon(icono, self)
+        self.tray = QSystemTrayIcon(cargar_icono_app(), self)
         menu = QMenu()
         menu.addAction("Cerrar sesión", self._on_cerrar_sesion)
         menu.addSeparator()

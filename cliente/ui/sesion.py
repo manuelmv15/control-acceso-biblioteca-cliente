@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from datetime import datetime
 from core.config import now_sv
+from ui.icono import cargar_icono_app
 
 
 class VentanaSesion(QWidget):
@@ -24,6 +25,7 @@ class VentanaSesion(QWidget):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._actualizar)
         self.setWindowTitle("Biblioteca — Sesión activa")
+        self.setWindowIcon(cargar_icono_app())
         self.resize(420, 480)
         self._construir_ui()
 
