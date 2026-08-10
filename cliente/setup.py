@@ -38,7 +38,7 @@ def generar_pc_id() -> str:
 
 def instalar_autostart_linux(app_path: str):
     python = sys.executable
-    icon = BASE_DIR / "assets" / "logo.png"
+    icon = BASE_DIR / "assets" / "logo_icono.png"
 
     desktop_dir = Path.home() / ".config" / "autostart"
     desktop_dir.mkdir(parents=True, exist_ok=True)

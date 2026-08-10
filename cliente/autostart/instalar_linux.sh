@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
 PYTHON="${PYTHON:-python3}"
-ICON="$APP_DIR/assets/logo.png"
+ICON="$APP_DIR/assets/logo_icono.png"
 AUTOSTART_DIR="$HOME/.config/autostart"
 DESKTOP_FILE="$AUTOSTART_DIR/biblioteca-kiosko.desktop"
 APPS_DIR="$HOME/.local/share/applications"
