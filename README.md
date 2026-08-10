@@ -123,6 +123,7 @@ Lee `config.ini` (secciones `[pc]`, `[servidor]`, `[sync]`, `[admin]`) y permite
 | `SYNC_INTERVAL` | `[sync] intervalo_segundos` | — | 30 |
 | `DURACION_SESION_MINUTOS` | `[sesion] duracion_minutos` | — | 60 |
 | `HARDWARE_INTERVAL_SEGUNDOS` | `[hardware] intervalo_segundos` | — | 300 |
+| `BLOQUEAR_ATAJOS_ESCRITORIO` | `[escritorio] bloquear_atajos` | `BIBLIOTECA_BLOQUEAR_ATAJOS` | `true` |
 
 También define `TZ_SV = ZoneInfo("America/El_Salvador")` y `now_sv()`, usados en toda la app para timestamps consistentes.
 
@@ -136,7 +137,7 @@ También define `TZ_SV = ZoneInfo("America/El_Salvador")` y `now_sv()`, usados e
 
 ## Detalles importantes / peculiaridades
 
-- **Modo kiosko real**: la ventana está siempre encima y sin bordes, y el botón de cerrar del sistema operativo está interceptado (solo oculta a la bandeja). No hay bloqueo a nivel de sistema operativo (no usa `xdg-screensaver`/`loginctl`), solo control a nivel de aplicación Qt — quien tenga acceso al escritorio podría en teoría minimizar o cambiar de ventana por otros medios.
+- **Modo kiosko real**: la ventana está siempre encima y sin bordes, y el botón de cerrar del sistema operativo está interceptado (solo oculta a la bandeja). Esto es control a nivel de aplicación Qt — no evita atajos que el propio *compositor* de GNOME captura antes de que el evento llegue a la ventana (p. ej. la tecla **Super**, que abre el resumen de Actividades, desde donde además se puede lanzar cualquier icono fijado en el dock — Firefox, Files, Terminal, etc. — sin pasar por el login). `core/bloqueo_escritorio.py` deshabilita vía `gsettings`, en cada arranque de `main.py`: tecla Super/`overlay-key`, Alt+Tab y variantes, "mostrar escritorio", el atajo de terminal (`Ctrl+Alt+T`) y el dock entero (`favorite-apps`, así no quedan iconos para lanzar otra app desde el resumen de Actividades). Es best-effort (solo actúa si detecta GNOME por `XDG_CURRENT_DESKTOP` y si hay `gsettings` disponible) y se puede desactivar con `[escritorio] bloquear_atajos = false` en `config.ini` (o `BIBLIOTECA_BLOQUEAR_ATAJOS=false`). Es una restricción de usuario, no de sistema: son claves dconf del usuario que ejecuta el kiosko — alguien con una terminal como ese mismo usuario podría revertirlas con `gsettings set` dentro de una sesión ya abierta (se reaplican en el próximo arranque del kiosko, no al instante).
 - **`.pc_id`**: archivo de texto plano con un UUID4, generado una sola vez. Es el identificador **estable y persistente** de la PC física usado en todos los payloads hacia el servidor — independiente del hostname/MAC, que solo sirven para inventario legible.
 - **Tolerancia a fallos de red**: cualquier excepción en la capa `network/` se traga y los datos quedan marcados como pendientes en SQLite, reintentándose automáticamente en el siguiente ciclo del daemon de sync, sin intervención del usuario.
 - **Modo invitado**: si el sector elegido no es "Estudiante", no se piden datos personales; la sesión se guarda con `carnet=None`. Requiere la migración `_migrar_carnet_nullable` en bases de datos creadas antes de que existiera este modo.

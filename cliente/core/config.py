@@ -47,3 +47,9 @@ DURACION_SESION_MINUTOS: int = int(_get("sesion", "duracion_minutos", default="6
 DURACION_SESION_MS: int = DURACION_SESION_MINUTOS * 60 * 1000
 
 HARDWARE_INTERVAL_SEGUNDOS: int = int(_get("hardware", "intervalo_segundos", default="300"))
+
+# Deshabilita atajos de GNOME (tecla Super, Alt+Tab, etc.) que permiten
+# salir del kiosko sin cerrar sesión — ver core/bloqueo_escritorio.py.
+BLOQUEAR_ATAJOS_ESCRITORIO: bool = _get(
+    "escritorio", "bloquear_atajos", "BIBLIOTECA_BLOQUEAR_ATAJOS", "true"
+).strip().lower() not in ("0", "false", "no")
