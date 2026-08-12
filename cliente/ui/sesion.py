@@ -17,6 +17,7 @@ class VentanaSesion(QWidget):
 
     cerrar_sesion = pyqtSignal()
     actualizar_datos = pyqtSignal()
+    reiniciar_tiempo = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -58,6 +59,11 @@ class VentanaSesion(QWidget):
         self.lbl_tiempo.setObjectName("timer")
         self.lbl_tiempo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_tiempo)
+
+        btn_reiniciar = QPushButton("Reiniciar tiempo (1 hora)")
+        btn_reiniciar.setObjectName("btn-secundario")
+        btn_reiniciar.clicked.connect(self.reiniciar_tiempo)
+        layout.addWidget(btn_reiniciar, alignment=Qt.AlignmentFlag.AlignCenter)
 
         layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 

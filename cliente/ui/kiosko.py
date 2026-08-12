@@ -83,6 +83,7 @@ class VentanaKiosko(QMainWindow):
         self.ventana_sesion = VentanaSesion()
         self.ventana_sesion.cerrar_sesion.connect(self._on_cerrar_sesion)
         self.ventana_sesion.actualizar_datos.connect(self._on_actualizar_datos)
+        self.ventana_sesion.reiniciar_tiempo.connect(self._on_reiniciar_tiempo)
 
     def _configurar_tray(self):
         self.tray = QSystemTrayIcon(cargar_icono_app(), self)
@@ -211,6 +212,28 @@ class VentanaKiosko(QMainWindow):
         self.tray.showMessage(
             "Biblioteca",
             "Datos actualizados correctamente.",
+            QSystemTrayIcon.MessageIcon.Information,
+            3000,
+        )
+
+    def _on_reiniciar_tiempo(self):
+        """Reinicia el contador de tiempo restante a una hora completa, por
+        si el estudiante desea continuar usando el equipo."""
+        if not self._sesion_activa_id:
+            return
+        ahora = now_sv()
+        log.info(
+            "Tiempo de sesión reiniciado a %d min — carnet %s",
+            DURACION_SESION_MS // 60000,
+            self._estudiante_activo["carnet"] if self._estudiante_activo else "invitado",
+        )
+        self._timer_sesion.start(DURACION_SESION_MS)
+        self.ventana_sesion.iniciar_sesion(
+            self._estudiante_mostrado, ahora, DURACION_SESION_MS, self._es_invitado
+        )
+        self.tray.showMessage(
+            "Biblioteca",
+            "Tiempo de sesión reiniciado a 1 hora.",
             QSystemTrayIcon.MessageIcon.Information,
             3000,
         )
