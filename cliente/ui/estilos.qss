@@ -99,6 +99,20 @@ QPushButton#btn-cerrar-sesion {
 
 QPushButton#btn-cerrar-sesion:hover { background-color: #1A171B; }
 
+QPushButton#btn-admin {
+    background-color: transparent;
+    color: #9A9A9A;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: normal;
+    min-width: 0;
+}
+
+QPushButton#btn-admin:hover { background-color: #EAEAEA; color: #696969; }
+QPushButton#btn-admin:pressed { background-color: #E0E0E0; }
+
 QComboBox {
     background-color: #F5F5F5;
     border: 2px solid #EEEEEE;

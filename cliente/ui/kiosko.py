@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import subprocess
 import uuid
 from datetime import date, datetime
 from pathlib import Path
@@ -75,6 +76,9 @@ class VentanaKiosko(QMainWindow):
 
         self.login.login_exitoso.connect(self._on_login)
         self.login.ir_registro.connect(lambda: self.stack.setCurrentIndex(PANTALLA_REGISTRO))
+        self.login.solicitar_apagar.connect(self._apagar_equipo)
+        self.login.solicitar_reiniciar.connect(self._reiniciar_equipo)
+        self.login.solicitar_cerrar_programa.connect(self._salida_admin)
         self.registro.registro_exitoso.connect(self._on_login)
         self.registro.actualizacion_exitosa.connect(self._on_actualizacion_exitosa)
         self.registro.acceso_no_estudiante.connect(self._on_login_no_estudiante)
@@ -284,6 +288,36 @@ class VentanaKiosko(QMainWindow):
         self._timer_sesion.stop()
         self.tray.hide()
         QApplication.quit()
+
+    def _apagar_equipo(self):
+        if not self._verificar_pin_admin():
+            return
+        log.info("Apagado del equipo solicitado desde login (admin)")
+        self._preparar_apagado_o_reinicio()
+        try:
+            subprocess.run(["systemctl", "poweroff"], check=True, timeout=10)
+        except Exception as exc:
+            log.error("Error al apagar el equipo: %s", exc)
+            QMessageBox.warning(self, "Error", "No se pudo apagar el equipo.")
+
+    def _reiniciar_equipo(self):
+        if not self._verificar_pin_admin():
+            return
+        log.info("Reinicio del equipo solicitado desde login (admin)")
+        self._preparar_apagado_o_reinicio()
+        try:
+            subprocess.run(["systemctl", "reboot"], check=True, timeout=10)
+        except Exception as exc:
+            log.error("Error al reiniciar el equipo: %s", exc)
+            QMessageBox.warning(self, "Error", "No se pudo reiniciar el equipo.")
+
+    def _preparar_apagado_o_reinicio(self):
+        """Cierra la sesión activa (si la hay) y detiene el timer antes de
+        entregarle el control al sistema operativo."""
+        if self._sesion_activa_id:
+            actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
+        self._timer_sesion.stop()
+        self.tray.hide()
 
     def _verificar_pin_admin(self) -> bool:
         if not ADMIN_PIN_HASH:

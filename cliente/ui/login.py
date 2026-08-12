@@ -11,6 +11,9 @@ from ui.log import log
 class PantallaLogin(QWidget):
     login_exitoso = pyqtSignal(dict)
     ir_registro = pyqtSignal()
+    solicitar_apagar = pyqtSignal()
+    solicitar_reiniciar = pyqtSignal()
+    solicitar_cerrar_programa = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -70,6 +73,29 @@ class PantallaLogin(QWidget):
         layout.addLayout(btn_row)
 
         layout.addSpacerItem(QSpacerItem(0, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
+        # Controles de administrador, discretos en la esquina inferior
+        # derecha. Requieren el PIN de administrador (ver
+        # VentanaKiosko._verificar_pin_admin) antes de ejecutarse.
+        fila_admin = QHBoxLayout()
+        fila_admin.addStretch()
+
+        btn_apagar = QPushButton("Apagar equipo")
+        btn_apagar.setObjectName("btn-admin")
+        btn_apagar.clicked.connect(self.solicitar_apagar)
+        fila_admin.addWidget(btn_apagar)
+
+        btn_reiniciar = QPushButton("Reiniciar equipo")
+        btn_reiniciar.setObjectName("btn-admin")
+        btn_reiniciar.clicked.connect(self.solicitar_reiniciar)
+        fila_admin.addWidget(btn_reiniciar)
+
+        btn_cerrar_programa = QPushButton("Cerrar programa")
+        btn_cerrar_programa.setObjectName("btn-admin")
+        btn_cerrar_programa.clicked.connect(self.solicitar_cerrar_programa)
+        fila_admin.addWidget(btn_cerrar_programa)
+
+        layout.addLayout(fila_admin)
 
     def _intentar_login(self):
         from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache
