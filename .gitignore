@@ -43,11 +43,7 @@ build/
 # Windows
 Thumbs.db
 desktop.ini
-docs/
 
-*.md
-
-!README.md
 
 # Entorno de prueba Docker para cliente/ (no es parte de la app ni del despliegue)
 cliente/docker/
