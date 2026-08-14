@@ -14,7 +14,7 @@ Este componente se instala **en cada PC de la sala** (kiosko). Requiere que `bib
 
 ```bash
 cd cliente
-pip install -r requirements.txt
+pip install --break-system-packages -r requirements.txt
 python setup.py
 ```
 
