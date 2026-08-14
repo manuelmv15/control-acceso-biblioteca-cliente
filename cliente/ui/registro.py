@@ -162,7 +162,7 @@ class PantallaRegistro(QWidget):
         self.carnet.setPlaceholderText(f"Número de carnet ({CARNET_PLACEHOLDER})")
         self.carnet.setMaxLength(7)
         self.carnet.setValidator(
-            QRegularExpressionValidator(QRegularExpression(r"[A-Za-z]{0,2}[0-9]{0,5}"))
+            QRegularExpressionValidator(QRegularExpression(r"[A-Za-z]{0,2}|[A-Za-z]{2}[0-9]{0,5}"))
         )
         self.carnet.textEdited.connect(self._forzar_mayusculas_carnet)
         form.addRow("Carnet:", self.carnet)

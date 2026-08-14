@@ -51,7 +51,7 @@ class PantallaLogin(QWidget):
         self.carnet_input.setPlaceholderText(f"Número de carnet ({CARNET_PLACEHOLDER})")
         self.carnet_input.setMaxLength(7)
         self.carnet_input.setValidator(
-            QRegularExpressionValidator(QRegularExpression(r"[A-Za-z]{0,2}[0-9]{0,5}"))
+            QRegularExpressionValidator(QRegularExpression(r"[A-Za-z]{0,2}|[A-Za-z]{2}[0-9]{0,5}"))
         )
         self.carnet_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.carnet_input.textEdited.connect(self._forzar_mayusculas)
