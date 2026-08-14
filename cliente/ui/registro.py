@@ -3,7 +3,10 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QComboBox, QCompleter,
     QScrollArea, QFrame
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QRegularExpression
+from PyQt6.QtGui import QRegularExpressionValidator
+
+from core.validacion import CARNET_PLACEHOLDER, carnet_valido, normalizar_carnet
 
 SEDE_SAN_MIGUEL = "San Miguel"
 SEDE_MORAZAN = "San Francisco Gotera (Morazán)"
@@ -156,7 +159,12 @@ class PantallaRegistro(QWidget):
         form.addRow("Nombre:", self.nombre)
 
         self.carnet = QLineEdit()
-        self.carnet.setPlaceholderText("Número de carnet")
+        self.carnet.setPlaceholderText(f"Número de carnet ({CARNET_PLACEHOLDER})")
+        self.carnet.setMaxLength(7)
+        self.carnet.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"[A-Za-z]{0,2}[0-9]{0,5}"))
+        )
+        self.carnet.textEdited.connect(self._forzar_mayusculas_carnet)
         form.addRow("Carnet:", self.carnet)
 
         from datetime import date as _date
@@ -210,6 +218,11 @@ class PantallaRegistro(QWidget):
 
         self._actualizar_departamentos(SEDE_SAN_MIGUEL)
         self._on_sector_changed(self.sector.currentText())
+
+    def _forzar_mayusculas_carnet(self, texto: str):
+        pos = self.carnet.cursorPosition()
+        self.carnet.setText(texto.upper())
+        self.carnet.setCursorPosition(pos)
 
     def _on_sector_changed(self, sector: str):
         """Solo estudiantes se registran: el resto únicamente indica a qué
@@ -289,10 +302,17 @@ class PantallaRegistro(QWidget):
         from network.client import hay_conexion
 
         nombre = self.nombre.text().strip()
-        carnet = self.carnet.text().strip()
+        carnet = normalizar_carnet(self.carnet.text())
 
         if not nombre or not carnet:
             self.lbl_error.setText("Nombre y carnet son obligatorios")
+            return
+
+        if not self._modo_actualizacion and not carnet_valido(carnet):
+            # En modo actualización el campo es de solo lectura (carnet ya
+            # existente); no tiene sentido revalidar un valor que el usuario
+            # no puede editar.
+            self.lbl_error.setText(f"Formato de carnet inválido. Use el formato {CARNET_PLACEHOLDER}.")
             return
 
         anio_nac = self.fecha_nac.currentText().strip()

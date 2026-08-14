@@ -1,11 +1,12 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpacerItem, QSizePolicy
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt, pyqtSignal, QRegularExpression
+from PyQt6.QtGui import QPixmap, QRegularExpressionValidator
 from pathlib import Path
 
 from ui.log import log
+from core.validacion import CARNET_PLACEHOLDER, carnet_valido, normalizar_carnet
 
 
 class PantallaLogin(QWidget):
@@ -47,9 +48,13 @@ class PantallaLogin(QWidget):
         layout.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         self.carnet_input = QLineEdit()
-        self.carnet_input.setPlaceholderText("Número de carnet")
-        self.carnet_input.setMaxLength(20)
+        self.carnet_input.setPlaceholderText(f"Número de carnet ({CARNET_PLACEHOLDER})")
+        self.carnet_input.setMaxLength(7)
+        self.carnet_input.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"[A-Za-z]{0,2}[0-9]{0,5}"))
+        )
         self.carnet_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.carnet_input.textEdited.connect(self._forzar_mayusculas)
         self.carnet_input.returnPressed.connect(self._intentar_login)
         layout.addWidget(self.carnet_input)
 
@@ -97,14 +102,22 @@ class PantallaLogin(QWidget):
 
         layout.addLayout(fila_admin)
 
+    def _forzar_mayusculas(self, texto: str):
+        pos = self.carnet_input.cursorPosition()
+        self.carnet_input.setText(texto.upper())
+        self.carnet_input.setCursorPosition(pos)
+
     def _intentar_login(self):
         from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache
         from network.estudiantes import obtener_estudiante
         from network.client import hay_conexion
 
-        carnet = self.carnet_input.text().strip()
+        carnet = normalizar_carnet(self.carnet_input.text())
         if not carnet:
             self.lbl_error.setText("Ingrese su carnet")
+            return
+        if not carnet_valido(carnet):
+            self.lbl_error.setText(f"Formato de carnet inválido. Use el formato {CARNET_PLACEHOLDER}.")
             return
 
         self.lbl_error.setText("Buscando...")
