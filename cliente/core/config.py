@@ -3,6 +3,7 @@ import uuid
 import configparser
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 TZ_SV = ZoneInfo("America/El_Salvador")
@@ -36,9 +37,65 @@ def _load_pc_id() -> str:
     return new_id
 
 
-SERVER_URL: str = _get("servidor", "url", "BIBLIOTECA_SERVER_URL", "http://localhost:8000")
+# Vía de escape explícita para aceptar SERVER_URL en http:// hacia un host
+# que no es localhost — ver _validar_server_url() más abajo. Default false:
+# hay que fijarlo a propósito, no es el comportamiento por omisión.
+PERMITIR_HTTP_INSEGURO: bool = _get(
+    "servidor", "permitir_http_inseguro", "BIBLIOTECA_PERMITIR_HTTP", "false"
+).strip().lower() in ("1", "true", "si", "sí")
+
+
+def _validar_server_url(url: str) -> str:
+    """PII de estudiantes y telemetría de hardware viajan en cada request a
+    SERVER_URL; sin TLS, cualquiera en la misma LAN puede leerlas/alterarlas
+    (incluyendo KIOSK_API_KEY, enviada en texto plano como header). Solo se
+    permite http:// hacia localhost — para cualquier otro host hace falta
+    https:// (ver docs/desarrollo/despliegue.md, sección TLS) o asumir el
+    riesgo a propósito con [servidor] permitir_http_inseguro = true."""
+    host = urlparse(url).hostname
+    if urlparse(url).scheme == "http" and host not in ("localhost", "127.0.0.1") and not PERMITIR_HTTP_INSEGURO:
+        raise RuntimeError(
+            f"SERVER_URL ({url}) usa http:// hacia un host que no es localhost — "
+            "la PII de estudiantes y KIOSK_API_KEY viajarían en texto plano por la "
+            "red. Configurá https:// (ver docs/desarrollo/despliegue.md, sección "
+            "TLS), usá localhost/127.0.0.1 solo para desarrollo, o si aceptás el "
+            "riesgo en una LAN cerrada y confiable, fijá "
+            "[servidor] permitir_http_inseguro = true en config.ini "
+            "(o BIBLIOTECA_PERMITIR_HTTP=1) explícitamente."
+        )
+    return url
+
+
+SERVER_URL: str = _validar_server_url(
+    _get("servidor", "url", "BIBLIOTECA_SERVER_URL", "http://localhost:8000")
+)
 KIOSK_API_KEY: str = _get("servidor", "kiosk_key", "BIBLIOTECA_KIOSK_KEY", "")
 ADMIN_PIN_HASH: str = _get("admin", "pin_hash", "BIBLIOTECA_ADMIN_PIN_HASH", "")
+
+# Certificado de la CA interna (PEM) que firmó el certificado del servidor,
+# para validar la conexión HTTPS cuando el servidor no tiene un certificado
+# de una CA pública (caso normal en la LAN del laboratorio, sin dominio
+# público — ver servidor/scripts/generar_ca.sh). Relativo a cliente/ si no
+# es una ruta absoluta. Si queda vacío, se usa el almacén de CAs del sistema
+# operativo (correcto si el servidor sí tiene un certificado público real).
+_CA_CERT_RAW: str = _get("servidor", "ca_cert", "BIBLIOTECA_CA_CERT", "")
+CA_CERT_PATH: str = ""
+if _CA_CERT_RAW:
+    _ca_path = Path(_CA_CERT_RAW)
+    if not _ca_path.is_absolute():
+        _ca_path = BASE_DIR / _ca_path
+    if not _ca_path.exists():
+        raise RuntimeError(
+            f"[servidor] ca_cert ({_CA_CERT_RAW}) está configurado pero el archivo "
+            f"no existe en {_ca_path}. Copiá el ca.pem generado por "
+            f"servidor/scripts/generar_ca.sh, o dejá el campo vacío si el servidor "
+            f"usa un certificado de una CA pública reconocida."
+        )
+    CA_CERT_PATH = str(_ca_path)
+
+# Parámetro `verify` listo para pasarle a requests.*: la ruta a la CA interna
+# si está configurada, o True (almacén de CAs del sistema) en caso contrario.
+VERIFY_TLS = CA_CERT_PATH or True
 PC_ID: str = _load_pc_id()
 PC_NOMBRE: str = _get("pc", "nombre", "BIBLIOTECA_PC_NOMBRE", "PC-00")
 SYNC_INTERVAL: int = int(_get("sync", "intervalo_segundos", default="30"))

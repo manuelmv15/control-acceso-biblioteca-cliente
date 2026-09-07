@@ -7,6 +7,7 @@ import uuid
 import sys
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "config.ini"
@@ -21,8 +22,46 @@ def preguntar(prompt: str, default: str = "") -> str:
     return respuesta
 
 
-def preguntar_server_url() -> str:
-    return preguntar("URL del servidor", "http://localhost:8000")
+def preguntar_server_url() -> tuple[str, bool]:
+    """Devuelve (url, permitir_http_inseguro). PII de estudiantes y
+    KIOSK_API_KEY viajan en cada request a esta URL; sin TLS, cualquiera en
+    la misma LAN puede leerlas/alterarlas. Solo se acepta http:// hacia
+    localhost sin preguntar — para cualquier otro host hace falta https://,
+    o confirmar explícitamente que se asume el riesgo."""
+    while True:
+        url = preguntar("URL del servidor", "http://localhost:8000")
+        host = urlparse(url).hostname
+        if urlparse(url).scheme == "http" and host not in ("localhost", "127.0.0.1"):
+            print(
+                f"  ⚠️  '{url}' usa http:// hacia un host que no es localhost: la PII "
+                "de estudiantes y KIOSK_API_KEY viajarían en texto plano por la red."
+            )
+            resp = preguntar(
+                "  ¿Continuar de todas formas con http:// (no recomendado — usa "
+                "https:// si el servidor ya tiene TLS configurado, ver "
+                "docs/desarrollo/despliegue.md)? (s/N)",
+                "n",
+            ).strip().lower()
+            if resp == "s":
+                return url, True
+            continue
+        return url, False
+
+
+def preguntar_ca_cert(server_url: str) -> str:
+    """Si el servidor usa https:// con un certificado de una CA interna
+    propia (no una CA pública reconocida — el caso normal en la LAN del
+    laboratorio, ver servidor/scripts/generar_ca.sh), hace falta su ca.pem
+    para validar la conexión. Vacío si el certificado ya es de una CA
+    pública, o si se está usando http:// (desarrollo/riesgo asumido)."""
+    if urlparse(server_url).scheme != "https":
+        return ""
+    return preguntar(
+        "Ruta al certificado de la CA interna (ca.pem) para validar el "
+        "servidor — dejalo vacío si el servidor usa un certificado de una "
+        "CA pública reconocida",
+        "",
+    )
 
 
 def generar_pc_id() -> str:
@@ -83,14 +122,20 @@ def main():
     print("=== Configuración de PC Biblioteca ===\n")
 
     nombre = preguntar("Nombre de esta PC (ej: PC-01)", "PC-01")
-    server_url = preguntar_server_url()
+    server_url, permitir_http_inseguro = preguntar_server_url()
+    ca_cert = preguntar_ca_cert(server_url)
     kiosk_key = preguntar("API key de kiosko (la misma KIOSK_API_KEY del servidor)", "")
     admin_pin = getpass.getpass("PIN de administrador para 'Salir (admin)' del kiosko (no se muestra en pantalla): ").strip()
     admin_pin_hash = hashlib.sha256(admin_pin.encode()).hexdigest() if admin_pin else ""
 
     config = configparser.ConfigParser()
     config["pc"] = {"nombre": nombre}
-    config["servidor"] = {"url": server_url, "kiosk_key": kiosk_key}
+    config["servidor"] = {
+        "url": server_url,
+        "kiosk_key": kiosk_key,
+        "ca_cert": ca_cert,
+        "permitir_http_inseguro": "true" if permitir_http_inseguro else "false",
+    }
     config["sync"] = {"intervalo_segundos": "30"}
     config["admin"] = {"pin_hash": admin_pin_hash}
 

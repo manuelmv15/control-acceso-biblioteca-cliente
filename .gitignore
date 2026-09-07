@@ -23,6 +23,11 @@ sync.log
 # Configuración con datos sensibles o de máquina específica
 cliente/config.ini
 cliente/.pc_id
+# Certificado de la CA interna (TLS), copiado por PC al configurar
+# [servidor] ca_cert — no es secreto pero es específico de cada despliegue,
+# no se versiona igual que config.ini/.pc_id (ver scripts/generar_ca.sh
+# en biblioteca_servidor).
+cliente/ca.pem
 
 # Distribución / empaquetado
 dist/
