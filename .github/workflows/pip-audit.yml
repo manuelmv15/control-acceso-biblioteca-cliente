@@ -1,0 +1,38 @@
+name: Auditoría de dependencias
+
+# H11 (AUDITORIA.md): el repo no tenía ningún pipeline de CI. Esto NO agrega
+# tests (siguen sin existir, ver AUDITORIA.md sección H11) — corre pip-audit
+# en cada push/PR y una vez por semana para no depender de que alguien lo
+# ejecute a mano (como en la auditoría de 2026-09), y un chequeo de sintaxis
+# barato (py_compile) como red mínima mientras no haya una suite de tests real.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # lunes 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar pip-audit
+        run: pip install pip-audit
+      - name: Auditar cliente/requirements.txt
+        run: pip-audit -r cliente/requirements.txt
+
+  sintaxis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compilar todos los .py (detecta errores de sintaxis)
+        run: python -m py_compile $(find . -name "*.py" -not -path "./.git/*")
