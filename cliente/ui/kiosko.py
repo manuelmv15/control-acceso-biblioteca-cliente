@@ -1,5 +1,3 @@
-import hashlib
-import hmac
 import subprocess
 import uuid
 from datetime import date, datetime
@@ -19,6 +17,7 @@ from ui.sesion import VentanaSesion
 from ui.icono import cargar_icono_app
 from db.sesiones import guardar_sesion, actualizar_hora_fin
 from core.config import PC_ID, DURACION_SESION_MS, ADMIN_PIN_HASH, now_sv
+from core.pin_hash import verificar_pin, es_hash_legacy
 from sync import forzar_sync
 import core.estado as estado_mod
 from ui.log import log
@@ -328,13 +327,25 @@ class VentanaKiosko(QMainWindow):
                 "([admin] pin_hash). Configúralo antes de poder salir del kiosko."
             )
             return False
+        if es_hash_legacy(ADMIN_PIN_HASH):
+            # Hash del formato viejo (SHA-256 plano sin sal, previo a H4 de
+            # AUDITORIA.md) — no se puede migrar en caliente sin conocer el
+            # PIN en texto plano, así que se bloquea y se pide reconfigurar.
+            log.warning("Salida admin bloqueada: pin_hash en formato legacy, requiere reconfigurar")
+            QMessageBox.warning(
+                self, "Reconfiguración requerida",
+                "El PIN de administrador quedó guardado en un formato antiguo "
+                "e inseguro. Volvé a ejecutar setup.py para configurar un PIN "
+                "nuevo antes de poder salir del kiosko."
+            )
+            return False
         pin, ok = QInputDialog.getText(
             self, "Salida de administrador", "PIN de administrador:",
             QLineEdit.EchoMode.Password
         )
         if not ok:
             return False
-        if hmac.compare_digest(hashlib.sha256(pin.encode()).hexdigest(), ADMIN_PIN_HASH):
+        if verificar_pin(pin, ADMIN_PIN_HASH):
             log.info("Salida admin autorizada (PIN correcto)")
             return True
         log.warning("Salida admin denegada: PIN incorrecto")

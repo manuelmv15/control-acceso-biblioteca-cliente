@@ -1,7 +1,6 @@
 """Script de configuración inicial — ejecutar una vez por PC hija."""
 import configparser
 import getpass
-import hashlib
 import subprocess
 import uuid
 import sys
@@ -12,6 +11,10 @@ from urllib.parse import urlparse
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "config.ini"
 PC_ID_FILE = BASE_DIR / ".pc_id"
+
+# Hace falta antes de poder importar core.pin_hash (paquete del propio proyecto).
+sys.path.insert(0, str(BASE_DIR))
+from core.pin_hash import generar_hash_pin, LONGITUD_MINIMA_PIN  # noqa: E402
 
 
 def preguntar(prompt: str, default: str = "") -> str:
@@ -62,6 +65,26 @@ def preguntar_ca_cert(server_url: str) -> str:
         "CA pública reconocida",
         "",
     )
+
+
+def preguntar_admin_pin() -> str:
+    """Devuelve el hash PBKDF2 del PIN de administrador (ver core/pin_hash.py,
+    H4 de AUDITORIA.md), o "" si se deja sin configurar (bloquea 'Salir
+    (admin)' hasta que se configure). Exige una longitud mínima: un PIN de
+    1-3 dígitos es trivial de adivinar por fuerza bruta en la UI misma, sin
+    ni siquiera necesitar el hash filtrado."""
+    while True:
+        admin_pin = getpass.getpass(
+            "PIN de administrador para 'Salir (admin)' del kiosko "
+            f"(mínimo {LONGITUD_MINIMA_PIN} caracteres, vacío para dejarlo sin configurar; "
+            "no se muestra en pantalla): "
+        ).strip()
+        if not admin_pin:
+            return ""
+        if len(admin_pin) < LONGITUD_MINIMA_PIN:
+            print(f"  ⚠️  El PIN debe tener al menos {LONGITUD_MINIMA_PIN} caracteres.")
+            continue
+        return generar_hash_pin(admin_pin)
 
 
 def generar_pc_id() -> str:
@@ -125,8 +148,7 @@ def main():
     server_url, permitir_http_inseguro = preguntar_server_url()
     ca_cert = preguntar_ca_cert(server_url)
     kiosk_key = preguntar("API key de kiosko (la misma KIOSK_API_KEY del servidor)", "")
-    admin_pin = getpass.getpass("PIN de administrador para 'Salir (admin)' del kiosko (no se muestra en pantalla): ").strip()
-    admin_pin_hash = hashlib.sha256(admin_pin.encode()).hexdigest() if admin_pin else ""
+    admin_pin_hash = preguntar_admin_pin()
 
     config = configparser.ConfigParser()
     config["pc"] = {"nombre": nombre}
@@ -145,8 +167,7 @@ def main():
 
     pc_id = generar_pc_id()
 
-    # Crear DB local
-    sys.path.insert(0, str(BASE_DIR))
+    # Crear DB local (sys.path ya tiene BASE_DIR, insertado arriba para core.pin_hash)
     from db import init_db
     init_db()
     print("  Base de datos local inicializada")
