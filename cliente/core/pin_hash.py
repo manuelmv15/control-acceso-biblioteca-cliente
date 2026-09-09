@@ -3,7 +3,7 @@
 Antes se guardaba `hashlib.sha256(pin.encode()).hexdigest()` — SHA-256 sin
 sal ni costo computacional, trivial de romper offline si `config.ini` se
 filtra (backup, USB, otra cuenta local antes del `chmod`), especialmente
-porque el PIN suele ser corto/numérico (AUDITORIA.md H4).
+porque el PIN suele ser corto/numérico.
 
 Este módulo porta el mismo esquema que ya usa el servidor para las
 contraseñas de admin (ver `servidor/routers/auth.py::generar_hash` /

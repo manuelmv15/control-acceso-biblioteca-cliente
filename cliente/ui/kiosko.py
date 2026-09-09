@@ -328,9 +328,9 @@ class VentanaKiosko(QMainWindow):
             )
             return False
         if es_hash_legacy(ADMIN_PIN_HASH):
-            # Hash del formato viejo (SHA-256 plano sin sal, previo a H4 de
-            # AUDITORIA.md) — no se puede migrar en caliente sin conocer el
-            # PIN en texto plano, así que se bloquea y se pide reconfigurar.
+            # Hash del formato viejo (SHA-256 plano sin sal) — no se puede
+            # migrar en caliente sin conocer el PIN en texto plano, así que
+            # se bloquea y se pide reconfigurar.
             log.warning("Salida admin bloqueada: pin_hash en formato legacy, requiere reconfigurar")
             QMessageBox.warning(
                 self, "Reconfiguración requerida",

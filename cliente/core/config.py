@@ -19,6 +19,19 @@ PC_ID_FILE = BASE_DIR / ".pc_id"
 _config = configparser.ConfigParser()
 _config.read(CONFIG_FILE, encoding="utf-8")
 
+# Best-effort: protege KIOSK_API_KEY/pin_hash contra otras cuentas del
+# sistema si config.ini ya existía de una instalación anterior a este
+# chmod (setup.py solo corre una vez, esto corre en cada arranque). No
+# cierra el vector principal (alguien escapando la sesión del kiosko) —
+# para eso hace falta el bloqueo de escritorio a nivel de sistema (ver
+# docs/desarrollo/despliegue.md, sección "Bloqueo de escritorio para
+# producción"), no permisos de archivo.
+if CONFIG_FILE.exists():
+    try:
+        os.chmod(CONFIG_FILE, 0o600)
+    except OSError:
+        pass
+
 
 def _get(section, key, env_var=None, default=""):
     if env_var and os.environ.get(env_var):

@@ -13,12 +13,14 @@ disponible, o alguna clave no existe en la versión instalada de GNOME
 Shell, se ignora esa clave puntual y se sigue con las demás. Nunca debe
 impedir que el kiosko arranque.
 
-Limitación conocida (ver README): esto deshabilita las claves para el
-usuario actual vía dconf de usuario, no las bloquea a nivel de sistema
+Limitación conocida: esto deshabilita las claves para el usuario actual
+vía dconf de usuario, no las bloquea a nivel de sistema
 (`/etc/dconf/db/.../locks`). Alguien con una terminal como ese mismo
 usuario podría revertirlas con `gsettings set` — se reaplican en cada
 arranque del kiosko, pero no dentro de una sesión ya abierta. Para un
-bloqueo que sobreviva a eso, ver la sección correspondiente del README.
+bloqueo que sobreviva a eso (dconf de sistema con locks + endurecimiento
+de BIOS/TTY), ver docs/desarrollo/despliegue.md, sección "Bloqueo de
+escritorio para producción"
 """
 import os
 import shutil

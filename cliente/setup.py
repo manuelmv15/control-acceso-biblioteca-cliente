@@ -68,8 +68,8 @@ def preguntar_ca_cert(server_url: str) -> str:
 
 
 def preguntar_admin_pin() -> str:
-    """Devuelve el hash PBKDF2 del PIN de administrador (ver core/pin_hash.py,
-    H4 de AUDITORIA.md), o "" si se deja sin configurar (bloquea 'Salir
+    """Devuelve el hash PBKDF2 del PIN de administrador (ver core/pin_hash.py),
+    o "" si se deja sin configurar (bloquea 'Salir
     (admin)' hasta que se configure). Exige una longitud mínima: un PIN de
     1-3 dígitos es trivial de adivinar por fuerza bruta en la UI misma, sin
     ni siquiera necesitar el hash filtrado."""
@@ -163,6 +163,7 @@ def main():
 
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         config.write(f)
+    os.chmod(CONFIG_FILE, 0o600)  # KIOSK_API_KEY y pin_hash: solo el dueño del proceso
     print(f"\nConfig guardada: {CONFIG_FILE}")
 
     pc_id = generar_pc_id()

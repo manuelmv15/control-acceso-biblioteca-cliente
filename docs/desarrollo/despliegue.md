@@ -99,6 +99,33 @@ Como el servidor normalmente no tiene un dominio público (solo una IP de LAN), 
 
 Certificado del servidor con vencimiento ~825 días (ver script) — calendarizar su renovación, no hay renovación automática como con una CA pública.
 
+## Bloqueo de escritorio para producción (evita fuga de `config.ini` y del código)
+
+`core/bloqueo_escritorio.py` deshabilita atajos de GNOME (Activities, Alt+Tab, dock, terminal) escribiendo dconf **de usuario** (`gsettings set`) en cada arranque del kiosko. Es best-effort a propósito y tiene un límite conocido, documentado en su propio docstring: son claves reversibles por cualquiera que consiga una terminal en esa misma sesión (`gsettings set ...` las pisa de nuevo, sin esperar al próximo arranque del kiosko). Y una vez con terminal en esa cuenta, el problema deja de ser leer `config.ini` (`KIOSK_API_KEY` compartida por los 16 equipos + hash del PIN admin) — ya hay acceso de red y al código fuente completos, con o sin el archivo. Verificado además que la propia app (`ui/`, `core/`) no expone ningún `QFileDialog` ni diálogo de impresión: toda la superficie de escape viene del entorno de escritorio, no de la app.
+
+Para que el bloqueo sobreviva a una terminal abierta como ese mismo usuario, hace falta reforzarlo a nivel de sistema — esto **complementa** a `bloqueo_escritorio.py`, no lo reemplaza. Está automatizado en `cliente/autostart/bloquear_sistema_linux.sh` (requiere sudo, idempotente):
+
+```bash
+cd cliente/autostart
+./bloquear_sistema_linux.sh
+```
+
+El script aplica, en orden:
+
+1. **dconf de sistema, con locks** (en vez de solo dconf de usuario) — mismas claves que deshabilita `bloqueo_escritorio.py` (Activities, Alt+Tab, dock, atajo de terminal), pero escritas en `/etc/dconf/db/local.d/` + `/etc/dconf/db/local.d/locks/` y aplicadas con `dconf update`. A diferencia del dconf de usuario, estas quedan fijadas para cualquier usuario del sistema — `gsettings set` desde una terminal ya no las puede revertir.
+2. **Bloqueo de cambio de terminal virtual** (`Ctrl+Alt+F2`), vía un drop-in en `/etc/systemd/logind.conf.d/90-kiosko.conf` (`NAutoVTs=1`, `ReserveVT=1`).
+3. **Desinstalar terminal y explorador de archivos** (`gnome-terminal`, `xterm`, `nautilus`) — opcional, se pregunta antes de ejecutar porque en algunas distros puede arrastrar otros paquetes del entorno GNOME. Si no están instalados, ningún atajo (cubierto o no por el punto 1) puede alcanzarlos.
+
+Ya está enganchado como paso opcional al final de `instalar_linux.sh` (se pregunta después de la opción de servicio systemd). Para revertir dconf + TTY (no la desinstalación de paquetes): `./desbloquear_sistema_linux.sh`.
+
+Lo único que el script **no puede automatizar**, porque requiere acceso físico a la BIOS/UEFI de cada PC:
+
+4. **BIOS/UEFI con contraseña de administrador**: deshabilitar boot por USB/medios externos y el modo recovery/single-user de GRUB. Sin esto, alguien arranca un live USB y monta el disco directamente — ningún bloqueo de la sesión gráfica importa en ese escenario.
+
+Con las cuatro capas aplicadas no queda, dentro de la sesión del kiosko, ninguna ruta hacia una terminal ni un explorador de archivos — eso es lo que protege `config.ini` y el código fuente en la práctica, más que cualquier permiso de archivo por sí solo. `setup.py` y `core/config.py` ya aplican `chmod 0600` a `config.ini` como buena práctica complementaria contra *otras* cuentas del sistema, pero eso no cierra este vector por sí solo.
+
+Mejora futura (no bloqueante): reemplazar la sesión GNOME completa por un compositor mínimo dedicado (p. ej. `cage`) que solo lance la app del kiosko, eliminando la superficie de escape por construcción en vez de ir deshabilitando atajos de GNOME uno por uno.
+
 ## Checklist antes de poner una PC en producción
 
 - [ ] `KIOSK_API_KEY` coincide exactamente con la del servidor.
@@ -108,7 +135,7 @@ Certificado del servidor con vencimiento ~825 días (ver script) — calendariza
 - [ ] Autostart (`.desktop` y, recomendado, servicio `systemd`) instalado y probado con un reinicio real de la PC.
 - [ ] Probado con 2-3 PCs antes de desplegar las 16 (o el total de la sala).
 - [ ] Verificado en el panel admin del servidor que la PC aparece y llegan sus sesiones + heartbeat de hardware.
-- [ ] Si el compositor es GNOME, confirmar que el bloqueo de atajos de escritorio (`core/bloqueo_escritorio.py`) se aplicó correctamente (ver `estructura.md`) — es best-effort y solo actúa sobre GNOME.
+- [ ] Si el compositor es GNOME, aplicado el bloqueo de atajos **a nivel de sistema** (ver sección **Bloqueo de escritorio para producción** arriba) — el `core/bloqueo_escritorio.py` por sí solo es best-effort a nivel de usuario y no sobrevive a una terminal abierta en esa misma sesión.
 
 ## Orden de despliegue del sistema completo
 
