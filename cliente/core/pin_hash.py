@@ -49,8 +49,8 @@ def verificar_pin(pin: str, hash_almacenado: str) -> bool:
 
 
 def es_hash_legacy(hash_almacenado: str) -> bool:
-    """True si `hash_almacenado` es del formato viejo (SHA-256 plano sin sal,
-    heredado de antes de H4) en vez de `pbkdf2_sha256$...` — indica que hace
+    """True si `hash_almacenado` es del formato viejo (SHA-256 plano sin sal)
+    en vez de `pbkdf2_sha256$...` — indica que hace
     falta reconfigurar el PIN (ejecutar `setup.py` de nuevo) para migrar al
     hash fuerte. Un `config.ini` vacío (sin PIN configurado) no es legacy,
     solo está sin configurar."""

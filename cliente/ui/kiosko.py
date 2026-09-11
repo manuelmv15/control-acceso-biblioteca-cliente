@@ -36,7 +36,7 @@ SALIDA_SECRETA = QKeySequence(
     )
 )
 
-# Rate limiting del PIN de administrador local (H18): sin esto, alguien con
+# Rate limiting del PIN de administrador local: sin esto, alguien con
 # acceso físico prolongado a un kiosko puede probar PINs manualmente sin
 # límite ni demora. Es en memoria del propio proceso (no persiste entre
 # reinicios de la app) porque no hay IP ni usuario que distinguir aquí —
