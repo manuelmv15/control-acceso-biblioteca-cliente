@@ -23,12 +23,12 @@ python setup.py
 1. **Nombre de la PC** (default `PC-01`) — identificador legible, se muestra en el panel admin.
 2. **URL del servidor** (default `http://localhost:8000`) — apuntar a la IP/dominio real de la PC maestra donde corre `biblioteca_servidor`. Si no es `http://localhost`/`127.0.0.1`, exige `https://` salvo que confirmes explícitamente que asumís el riesgo de usar `http://` sin cifrar — ver sección **TLS** más abajo.
 3. **Certificado de la CA interna** (`ca.pem`), solo si elegiste `https://` — necesario para validar el servidor cuando usa un certificado propio (no de una CA pública). Ver sección **TLS**.
-4. **API key de kiosko** (`KIOSK_API_KEY`) — debe ser **exactamente la misma** que la configurada en el `.env` del servidor. Sin esto, el login y registro de estudiantes fallan con 401.
-5. **PIN de administrador** para la salida administrativa del kiosko (se pide oculto con `getpass`, se guarda como hash SHA-256, nunca en texto plano). Si se deja vacío, la salida administrativa queda bloqueada hasta configurarlo.
+4. En este punto genera (o reutiliza) `.pc_id` — UUID4 que identifica a esta PC de forma estable, independiente del hostname/MAC — y lo muestra en pantalla.
+5. **API key de esta PC** (`KIOSK_API_KEY`) — se genera desde el panel admin del servidor (pestaña "PCs", botón "Generar API key") usando el `PC_ID` que acaba de mostrar el paso anterior; el valor solo se ve una vez ahí. Sin esto, el login y registro de estudiantes fallan con 401.
+6. **PIN de administrador** para la salida administrativa del kiosko (se pide oculto con `getpass`, se guarda como hash SHA-256, nunca en texto plano). Si se deja vacío, la salida administrativa queda bloqueada hasta configurarlo.
 
 Luego `setup.py`:
 - Escribe `config.ini` con todo lo anterior.
-- Genera (o reutiliza) `.pc_id` — UUID4 que identifica a esta PC de forma estable, independiente del hostname/MAC.
 - Inicializa la base de datos SQLite local.
 - Ofrece instalar el autostart (ver siguiente sección).
 
@@ -72,7 +72,7 @@ Mata cualquier proceso en ejecución de la app, elimina el `.desktop` de autosta
 | `SERVER_URL` | `[servidor] url` | `BIBLIOTECA_SERVER_URL` | `http://localhost:8000` |
 | `PERMITIR_HTTP_INSEGURO` | `[servidor] permitir_http_inseguro` | `BIBLIOTECA_PERMITIR_HTTP` | `false` — con `SERVER_URL` en `http://` hacia un host que no es localhost, la app rehúsa arrancar salvo que esto sea `true` |
 | `CA_CERT_PATH` | `[servidor] ca_cert` | `BIBLIOTECA_CA_CERT` | `""` (vacío → usa el almacén de CAs del sistema; poner acá el `ca.pem` de la CA interna si el servidor no tiene un certificado público) |
-| `KIOSK_API_KEY` | `[servidor] kiosk_key` | `BIBLIOTECA_KIOSK_KEY` | `""` (vacío → login/registro falla con 401) |
+| `KIOSK_API_KEY` | `[servidor] kiosk_key` | `BIBLIOTECA_KIOSK_KEY` | `""` (vacío → login/registro falla con 401). Key propia de esta PC (generada desde el panel para su `PC_ID`, no compartida con las demás) — se manda junto con `X-PC-Id` en cada request. |
 | `ADMIN_PIN_HASH` | `[admin] pin_hash` | `BIBLIOTECA_ADMIN_PIN_HASH` | `""` (vacío → salida admin bloqueada) |
 | `PC_ID` | archivo `.pc_id` | — (solo por archivo) | uuid4 generado |
 | `PC_NOMBRE` | `[pc] nombre` | `BIBLIOTECA_PC_NOMBRE` | `PC-00` |
@@ -101,7 +101,7 @@ Certificado del servidor con vencimiento ~825 días (ver script) — calendariza
 
 ## Bloqueo de escritorio para producción (evita fuga de `config.ini` y del código)
 
-`core/bloqueo_escritorio.py` deshabilita atajos de GNOME (Activities, Alt+Tab, dock, terminal) escribiendo dconf **de usuario** (`gsettings set`) en cada arranque del kiosko. Es best-effort a propósito y tiene un límite conocido, documentado en su propio docstring: son claves reversibles por cualquiera que consiga una terminal en esa misma sesión (`gsettings set ...` las pisa de nuevo, sin esperar al próximo arranque del kiosko). Y una vez con terminal en esa cuenta, el problema deja de ser leer `config.ini` (`KIOSK_API_KEY` compartida por los 16 equipos + hash del PIN admin) — ya hay acceso de red y al código fuente completos, con o sin el archivo. Verificado además que la propia app (`ui/`, `core/`) no expone ningún `QFileDialog` ni diálogo de impresión: toda la superficie de escape viene del entorno de escritorio, no de la app.
+`core/bloqueo_escritorio.py` deshabilita atajos de GNOME (Activities, Alt+Tab, dock, terminal) escribiendo dconf **de usuario** (`gsettings set`) en cada arranque del kiosko. Es best-effort a propósito y tiene un límite conocido, documentado en su propio docstring: son claves reversibles por cualquiera que consiga una terminal en esa misma sesión (`gsettings set ...` las pisa de nuevo, sin esperar al próximo arranque del kiosko). Y una vez con terminal en esa cuenta, el problema deja de ser leer `config.ini` (`KIOSK_API_KEY` de esta PC + hash del PIN admin; comprometerla solo afecta a este equipo, ver `KIOSK_API_KEY` en la tabla de variables arriba) — ya hay acceso de red y al código fuente completos, con o sin el archivo. Verificado además que la propia app (`ui/`, `core/`) no expone ningún `QFileDialog` ni diálogo de impresión: toda la superficie de escape viene del entorno de escritorio, no de la app.
 
 Para que el bloqueo sobreviva a una terminal abierta como ese mismo usuario, hace falta reforzarlo a nivel de sistema — esto **complementa** a `bloqueo_escritorio.py`, no lo reemplaza. Está automatizado en `cliente/autostart/bloquear_sistema_linux.sh` (requiere sudo, idempotente):
 
@@ -128,7 +128,7 @@ Mejora futura (no bloqueante): reemplazar la sesión GNOME completa por un compo
 
 ## Checklist antes de poner una PC en producción
 
-- [ ] `KIOSK_API_KEY` coincide exactamente con la del servidor.
+- [ ] `KIOSK_API_KEY` generada desde el panel del servidor específicamente para el `PC_ID` de esta PC (pestaña "PCs" → "Generar API key"), no una key reutilizada de otra PC.
 - [ ] PIN de administrador configurado (no vacío) — de lo contrario nadie puede hacer la salida administrativa.
 - [ ] `SERVER_URL` apunta a la IP/dominio correcto de la PC maestra, no a `localhost`.
 - [ ] `SERVER_URL` usa `https://` con el `ca.pem` de la CA interna configurado en `[servidor] ca_cert` (ver sección **TLS**) — o, si se decidió operar en `http://` a propósito, `permitir_http_inseguro = true` está fijado y el riesgo fue aceptado conscientemente, no por omisión.

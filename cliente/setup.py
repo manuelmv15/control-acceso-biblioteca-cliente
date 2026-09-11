@@ -147,7 +147,21 @@ def main():
     nombre = preguntar("Nombre de esta PC (ej: PC-01)", "PC-01")
     server_url, permitir_http_inseguro = preguntar_server_url()
     ca_cert = preguntar_ca_cert(server_url)
-    kiosk_key = preguntar("API key de kiosko (la misma KIOSK_API_KEY del servidor)", "")
+
+    # El PC_ID identifica a esta PC ante el servidor: hace falta generarlo (o
+    # leer el existente) antes de pedir la API key, porque el admin la genera
+    # desde el panel para este PC_ID puntual (pestaña "PCs" -> "Generar API
+    # key" -> PUT /pcs/{pc_id}/api-key), no un valor compartido con las demás.
+    pc_id = generar_pc_id()
+    print(
+        f"\n  Este PC_ID ({pc_id}) es el que hay que darle a quien administra "
+        "el panel para que genere la API key de esta PC específica."
+    )
+    kiosk_key = preguntar(
+        "API key de esta PC (generada desde el panel admin para el PC_ID de "
+        "arriba; se ve una sola vez ahí, así que copiala ahora)",
+        "",
+    )
     admin_pin_hash = preguntar_admin_pin()
 
     config = configparser.ConfigParser()
@@ -165,8 +179,6 @@ def main():
         config.write(f)
     os.chmod(CONFIG_FILE, 0o600)  # KIOSK_API_KEY y pin_hash: solo el dueño del proceso
     print(f"\nConfig guardada: {CONFIG_FILE}")
-
-    pc_id = generar_pc_id()
 
     # Crear DB local (sys.path ya tiene BASE_DIR, insertado arriba para core.pin_hash)
     from db import init_db

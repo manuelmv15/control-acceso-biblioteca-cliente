@@ -102,7 +102,7 @@ Loguea todo en `sync.log`. Expone `forzar_sync()`, invocado tras login, logout o
 ## Configuración
 
 ### `setup.py` — configuración inicial (una vez por PC)
-Pide nombre de PC (default `PC-01`), URL del servidor (default `http://localhost:8000`), la API key de kiosko (`KIOSK_API_KEY` compartida con el servidor) y un PIN de administrador para "Salir (admin)" (se pide oculto con `getpass` y se guarda como hash SHA-256, nunca en texto plano); escribe `config.ini`, genera (o reutiliza) `.pc_id`, inicializa la base de datos local, y ofrece instalar el autostart. Si se deja el PIN vacío, avisa que la salida administrativa quedará bloqueada hasta configurarlo.
+Pide nombre de PC (default `PC-01`), URL del servidor (default `http://localhost:8000`), genera (o reutiliza) el `PC_ID` de esta PC y lo muestra en pantalla, pide la API key de esta PC (`KIOSK_API_KEY`, generada desde el panel admin del servidor para ese `PC_ID` puntual — pestaña "PCs", botón "Generar API key"; se ve una sola vez ahí) y un PIN de administrador para "Salir (admin)" (se pide oculto con `getpass` y se guarda como hash SHA-256, nunca en texto plano); escribe `config.ini`, inicializa la base de datos local, y ofrece instalar el autostart. Si se deja el PIN vacío, avisa que la salida administrativa quedará bloqueada hasta configurarlo.
 
 ```bash
 cd cliente
@@ -116,7 +116,7 @@ Lee `config.ini` (secciones `[pc]`, `[servidor]`, `[sync]`, `[admin]`) y permite
 | Variable | Fuente en `config.ini` | Variable de entorno | Default |
 |---|---|---|---|
 | `SERVER_URL` | `[servidor] url` | `BIBLIOTECA_SERVER_URL` | `http://localhost:8000` |
-| `KIOSK_API_KEY` | `[servidor] kiosk_key` | `BIBLIOTECA_KIOSK_KEY` | `""` (vacío → login/registro fallará con 401) |
+| `KIOSK_API_KEY` | `[servidor] kiosk_key` | `BIBLIOTECA_KIOSK_KEY` | `""` (vacío → login/registro fallará con 401). Es la key propia de esta PC (generada desde el panel para su `PC_ID`), no un valor compartido con las demás — el cliente la manda junto con `X-PC-Id` en cada request. |
 | `ADMIN_PIN_HASH` | `[admin] pin_hash` | `BIBLIOTECA_ADMIN_PIN_HASH` | `""` (vacío → "Salir (admin)" queda bloqueado) |
 | `PC_ID` | archivo `.pc_id` | — (solo por archivo) | uuid4 generado |
 | `PC_NOMBRE` | `[pc] nombre` | `BIBLIOTECA_PC_NOMBRE` | `PC-00` |

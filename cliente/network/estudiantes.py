@@ -1,7 +1,7 @@
 import requests
-from core.config import SERVER_URL, KIOSK_API_KEY, VERIFY_TLS
+from core.config import SERVER_URL, KIOSK_API_KEY, PC_ID, VERIFY_TLS
 
-_HEADERS = {"X-Kiosk-Key": KIOSK_API_KEY} if KIOSK_API_KEY else {}
+_HEADERS = {"X-Kiosk-Key": KIOSK_API_KEY, "X-PC-Id": PC_ID} if KIOSK_API_KEY else {}
 
 
 def obtener_estudiante(carnet: str) -> dict | None:
