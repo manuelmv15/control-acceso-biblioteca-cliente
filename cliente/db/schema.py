@@ -74,6 +74,12 @@ def init_db():
             ultimo_heartbeat TEXT,
             ultimo_mantenimiento_conocido TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS pin_admin_lockout (
+            pc_id TEXT PRIMARY KEY,
+            intentos_fallidos INTEGER NOT NULL DEFAULT 0,
+            bloqueado_hasta REAL NOT NULL DEFAULT 0
+        );
     """)
     conn.commit()
 
