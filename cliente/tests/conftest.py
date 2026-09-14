@@ -11,6 +11,7 @@ CLIENTE_DIR = Path(__file__).resolve().parents[1]
 if str(CLIENTE_DIR) not in sys.path:
     sys.path.insert(0, str(CLIENTE_DIR))
 
+from db import cifrado as db_cifrado  # noqa: E402
 from db import connection as db_connection  # noqa: E402
 from db.schema import init_db  # noqa: E402
 
@@ -21,8 +22,15 @@ def db_temporal(tmp_path, monkeypatch):
     tocar `cliente/biblioteca_local.db` (la base real del kiosko). db/*.py
     llama siempre a `db.connection.get_connection()`, que abre `DB_PATH` —
     reemplazar ese atributo del módulo alcanza para redirigir todas las
-    funciones de db/ sin tocar su código."""
+    funciones de db/ sin tocar su código.
+
+    También redirige la clave de cifrado de `db/cifrado.py` (`_KEY_PATH`) a
+    un archivo bajo tmp_path y resetea el `Fernet` cacheado (`_fernet_instancia`)
+    para que se regenere con esa clave — de lo contrario un test reusaría la
+    clave real de `cliente/db_key.bin` (o la de un test anterior)."""
     ruta = tmp_path / "biblioteca_local_test.db"
     monkeypatch.setattr(db_connection, "DB_PATH", ruta)
+    monkeypatch.setattr(db_cifrado, "_KEY_PATH", tmp_path / "db_key_test.bin")
+    monkeypatch.setattr(db_cifrado, "_fernet_instancia", None)
     init_db()
     return ruta

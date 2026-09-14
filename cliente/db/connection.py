@@ -7,9 +7,11 @@ DB_PATH = Path(__file__).parent.parent / "biblioteca_local.db"
 
 def _restringir_permisos():
     """biblioteca_local.db guarda PII de estudiantes (nombre, carrera,
-    facultad, año de nacimiento, sexo) sin cifrar; restringe el acceso al
-    dueño del proceso para que otras cuentas locales no puedan leerla.
-    Incluye -wal/-shm (modo WAL): también pueden contener filas recientes."""
+    facultad, año de nacimiento, sexo); los campos PII están cifrados en
+    reposo desde `db/cifrado.py`, pero esto restringe además el acceso al
+    dueño del proceso para que otras cuentas locales no puedan ni siquiera
+    leer el archivo cifrado. Incluye -wal/-shm (modo WAL): también pueden
+    contener filas recientes."""
     for sufijo in ("", "-wal", "-shm"):
         p = DB_PATH.with_name(DB_PATH.name + sufijo)
         if p.exists():
