@@ -1,0 +1,4 @@
+# Dependencias solo para desarrollo/CI. A propósito NO incluye requirements.txt:
+# los tests actuales solo ejercitan db/*.py (sqlite3 + stdlib), no PyQt6,
+# requests ni el resto de la app, así que no hace falta instalar Qt en CI.
+pytest==8.3.4

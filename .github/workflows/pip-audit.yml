@@ -1,9 +1,8 @@
 name: Auditoría de dependencias
 
-# El repo no tenía ningún pipeline de CI. Esto NO agrega tests (siguen sin
-# existir) — corre pip-audit en cada push/PR y una vez por semana para no
-# depender de que alguien lo ejecute a mano, y un chequeo de sintaxis barato
-# (py_compile) como red mínima mientras no haya una suite de tests real.
+# Corre pip-audit en cada push/PR y una vez por semana para no depender de
+# que alguien lo ejecute a mano, un chequeo de sintaxis barato (py_compile)
+# como red mínima, y la suite de tests de cliente/tests/ (pytest).
 
 on:
   push:
@@ -35,3 +34,15 @@ jobs:
           python-version: "3.12"
       - name: Compilar todos los .py (detecta errores de sintaxis)
         run: python -m py_compile $(find . -name "*.py" -not -path "./.git/*")
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias (incluye pytest)
+        run: pip install -r cliente/requirements-dev.txt
+      - name: Correr tests
+        run: pytest cliente/tests
