@@ -1,10 +1,11 @@
 """Script de configuración inicial — ejecutar una vez por PC hija."""
 import configparser
 import getpass
-import subprocess
-import uuid
-import sys
 import os
+import shutil
+import subprocess
+import sys
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -14,7 +15,7 @@ PC_ID_FILE = BASE_DIR / ".pc_id"
 
 # Hace falta antes de poder importar core.pin_hash (paquete del propio proyecto).
 sys.path.insert(0, str(BASE_DIR))
-from core.pin_hash import generar_hash_pin, LONGITUD_MINIMA_PIN  # noqa: E402
+from core.pin_hash import LONGITUD_MINIMA_PIN, generar_hash_pin  # noqa: E402
 
 
 def preguntar(prompt: str, default: str = "") -> str:
@@ -135,10 +136,15 @@ Terminal=false
 Categories=Utility;
 """)
     print(f"  Entrada de aplicación creada: {apps_desktop_file}")
-    subprocess.run(
-        ["update-desktop-database", str(apps_dir)],
-        capture_output=True, check=False,
-    )
+    # Best-effort: solo refresca la caché de íconos/menú. En algunos entornos
+    # mínimos el binario ni siquiera existe, así que se verifica antes en vez
+    # de dejar que un FileNotFoundError tumbe el resto del setup.
+    update_desktop_db_bin = shutil.which("update-desktop-database")
+    if update_desktop_db_bin:
+        subprocess.run(
+            [update_desktop_db_bin, str(apps_dir)],
+            capture_output=True, check=False,
+        )
 
 
 def main():
@@ -191,7 +197,7 @@ def main():
         app_main = str(BASE_DIR / "main.py")
         instalar_autostart_linux(app_main)
 
-    print(f"\n=== Configuración completa ===")
+    print("\n=== Configuración completa ===")
     print(f"  PC: {nombre}")
     print(f"  ID: {pc_id}")
     print(f"  Servidor: {server_url}")
@@ -199,7 +205,7 @@ def main():
         print("  ⚠️  Sin API key de kiosko: el login/registro de estudiantes fallará (401) hasta que la configures en config.ini")
     if not admin_pin_hash:
         print("  ⚠️  Sin PIN de administrador: 'Salir (admin)' quedará bloqueado hasta que configures [admin] pin_hash en config.ini")
-    print(f"\nEjecutar: python main.py")
+    print("\nEjecutar: python main.py")
 
 
 if __name__ == "__main__":

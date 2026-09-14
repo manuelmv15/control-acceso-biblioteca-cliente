@@ -32,6 +32,14 @@ Luego `setup.py`:
 - Inicializa la base de datos SQLite local.
 - Ofrece instalar el autostart (ver siguiente sección).
 
+## Binario empaquetado (PyInstaller, CI)
+
+`.github/workflows/pip-audit.yml` (job `build-cliente`) empaqueta `main.py` con PyInstaller (`cliente/build.spec`) en cada push/PR y sube el resultado como artifact (`biblioteca-kiosko-linux`, 30 días de retención) — sirve como verificación automática de que el kiosko sigue empaquetando y arrancando (smoke test headless), y como forma de bajar un build ya armado sin instalar Python en la PC destino.
+
+**Sigue siendo `onedir`, no `onefile`**: el resultado es una carpeta (`biblioteca-kiosko/` con el ejecutable y `_internal/` al lado), no un solo archivo. Es a propósito — `config.ini`, `.pc_id` y la base SQLite local se guardan junto al código (`_internal/`), y en un bundle `onefile` esa carpeta se recrearía vacía en un directorio temporal distinto cada vez que se abre la app, perdiendo la identidad de la PC y el caché local en cada reinicio. Para usarlo hay que copiar la carpeta `biblioteca-kiosko/` completa, no solo el ejecutable.
+
+**Limitación actual: `setup.py` no está empaquetado**, solo `main.py`. El binario no tiene el asistente de primera configuración — antes de usarlo en una PC hace falta generar su `config.ini`/`.pc_id` (con `python setup.py` desde un checkout del código, ver más abajo) y copiar esos dos archivos dentro de `_internal/` de la carpeta empaquetada. Como cada PC necesita su propio `.pc_id`/API key (ver siguiente sección), **no se puede copiar la misma carpeta ya configurada a las 16 PCs** — cada una necesita su propio `setup.py` + su propia copia de `_internal/config.ini`/`_internal/.pc_id`, o (más simple hoy) seguir instalando desde código fuente como abajo. Este binario es, por ahora, sobre todo una verificación de CI, no todavía el método de despliegue recomendado.
+
 ## Autostart en Linux (`cliente/autostart/`)
 
 ### Instalar

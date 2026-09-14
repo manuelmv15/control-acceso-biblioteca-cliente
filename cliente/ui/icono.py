@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PyQt6.QtGui import QIcon, QPixmap, QColor
+from PyQt6.QtGui import QColor, QIcon, QPixmap
 
 _LOGO_PATH = Path(__file__).parent.parent / "assets" / "logo_icono.png"
 

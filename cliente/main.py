@@ -1,13 +1,13 @@
 import sys
-from PyQt6.QtWidgets import QApplication
 
-from db import init_db
-from sync import iniciar as iniciar_sync
-from hardware.agent import iniciar as iniciar_hardware_agent
-from ui.kiosko import VentanaKiosko
-from ui.icono import cargar_icono_app
-from core.config import BLOQUEAR_ATAJOS_ESCRITORIO
 from core.bloqueo_escritorio import aplicar as aplicar_bloqueo_escritorio
+from core.config import BLOQUEAR_ATAJOS_ESCRITORIO
+from db import init_db
+from hardware.agent import iniciar as iniciar_hardware_agent
+from PyQt6.QtWidgets import QApplication
+from sync import iniciar as iniciar_sync
+from ui.icono import cargar_icono_app
+from ui.kiosko import VentanaKiosko
 
 
 def main():

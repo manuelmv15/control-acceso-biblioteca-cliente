@@ -1,5 +1,5 @@
 import requests
-from core.config import SERVER_URL, KIOSK_API_KEY, PC_ID, VERIFY_TLS
+from core.config import KIOSK_API_KEY, PC_ID, SERVER_URL, VERIFY_TLS
 
 _HEADERS = {"X-Kiosk-Key": KIOSK_API_KEY, "X-PC-Id": PC_ID} if KIOSK_API_KEY else {}
 

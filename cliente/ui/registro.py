@@ -1,12 +1,19 @@
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QLabel, QLineEdit, QPushButton, QComboBox, QCompleter,
-    QScrollArea, QFrame
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QRegularExpression
-from PyQt6.QtGui import QRegularExpressionValidator
-
 from core.validacion import CARNET_PLACEHOLDER, carnet_valido, normalizar_carnet
+from PyQt6.QtCore import QRegularExpression, Qt, pyqtSignal
+from PyQt6.QtGui import QRegularExpressionValidator
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QCompleter,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 SEDE_SAN_MIGUEL = "San Miguel"
 SEDE_MORAZAN = "San Francisco Gotera (Morazán)"
@@ -297,9 +304,10 @@ class PantallaRegistro(QWidget):
 
         import uuid
         from datetime import date
-        from db.estudiantes import guardar_estudiante_cache, buscar_estudiante_cache
-        from network.estudiantes import registrar_estudiante, obtener_estudiante
+
+        from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache
         from network.client import hay_conexion
+        from network.estudiantes import obtener_estudiante, registrar_estudiante
 
         nombre = self.nombre.text().strip()
         carnet = normalizar_carnet(self.carnet.text())

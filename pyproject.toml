@@ -1,0 +1,61 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 110
+
+[tool.ruff.lint]
+# Selección deliberada y acotada (no el default de ruff, que en versiones
+# recientes activa de más plugins — flake8-blind-except, flake8-bandit,
+# flake8-datetimez, refurb, pylint, etc.). En particular NO se seleccionan
+# BLE (blind except) ni S110 (try/except/pass): el agente de hardware
+# (`hardware/collector.py`, `hardware/agent.py`) y la UI usan
+# `except Exception: pass`/`log.exception(...)` a propósito en varios
+# puntos — un kiosko de biblioteca no debe congelarse ni cerrarse porque
+# falló una lectura opcional de sensor o `smartctl` no está instalado — y
+# fighting esa decisión de diseño con el linter solo generaría ruido.
+# pyflakes (F), pycodestyle (E/W), isort (I), pyupgrade (UP),
+# flake8-bugbear (B) y flake8-comprehensions (C4).
+select = ["E", "F", "I", "UP", "B", "C4"]
+ignore = [
+    # El proyecto usa `Optional[X]` de `typing` de forma consistente;
+    # forzar `X | None` sería un cambio cosmético masivo sin relación con
+    # ningún bug real.
+    "UP045",
+    # El código existente tiene muchas líneas por encima de 88 columnas
+    # (mensajes de UI, docstrings, llamadas con varios kwargs) repartidas en
+    # casi todos los módulos de `ui/`. Reformatear todo eso a mano solo por
+    # el lint, en archivos que no cambiaron por otra razón, es puro riesgo
+    # (typos, strings de PyQt rotos) sin beneficio funcional -- se deja
+    # para cuando se adopte un formateador automático (`ruff format`/
+    # `black`) en vez de perseguirlo regla por regla.
+    "E501",
+]
+
+[tool.bandit]
+skips = [
+    # Bandit marca cualquier `import subprocess` con esto, sin mirar cómo se
+    # usa. Los cuatro sitios que lo importan en este repo
+    # (core/bloqueo_escritorio.py, hardware/collector.py, setup.py,
+    # ui/kiosko.py) invocan gsettings/smartctl/update-desktop-database/
+    # systemctl con listas de argumentos fijas (nunca `shell=True`, nunca
+    # texto de usuario), resolviendo el binario vía `shutil.which()` antes
+    # de llamarlo (ver B607, ya corregido en código en vez de omitido acá).
+    "B404",
+    # Mismos cuatro sitios: correr un `subprocess.run([...])` sin
+    # `shell=True` con una lista de argumentos fija es exactamente el patrón
+    # seguro que bandit mismo recomienda — esta regla igual lo marca
+    # "a revisar" cada vez que se usa subprocess así, sin distinguir de un
+    # `shell=True` real.
+    "B603",
+    # `hardware/collector.py` (lecturas opcionales de sensores/psutil/
+    # smartctl) y `network/estudiantes.py`/`network/hardware.py` (fetch
+    # opcional al servidor) usan `except Exception: pass` a propósito: un
+    # kiosko de biblioteca no debe congelarse ni cerrar sesión porque falló
+    # una lectura de hardware opcional o el servidor no respondió una
+    # consulta puntual (se reintenta en el próximo ciclo de sync).
+    "B110",
+    # db/sesiones.py::marcar_sincronizado construye el `IN (...)` repitiendo
+    # el placeholder `?` una vez por id (`",".join("?" * len(ids))`) — nunca
+    # interpola un valor real; los ids viajan parametrizados en la tupla de
+    # bind params. Se verificó a mano al agregar este job de SAST.
+    "B608",
+]

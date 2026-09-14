@@ -1,28 +1,35 @@
+import shutil
 import subprocess
 import time
 import uuid
 from datetime import date, datetime
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
-    QMainWindow, QStackedWidget, QApplication, QSystemTrayIcon, QMenu,
-    QInputDialog, QLineEdit, QMessageBox
-)
-from PyQt6.QtCore import Qt, QTimer, QKeyCombination
+import core.estado as estado_mod
+from core.config import ADMIN_PIN_HASH, DURACION_SESION_MS, PC_ID, now_sv
+from core.pin_hash import es_hash_legacy, verificar_pin
+from db.pin_admin import guardar_estado_pin, obtener_estado_pin
+from db.sesiones import actualizar_hora_fin, guardar_sesion
+from PyQt6.QtCore import QKeyCombination, Qt, QTimer
 from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtWidgets import (
+    QApplication,
+    QInputDialog,
+    QLineEdit,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QStackedWidget,
+    QSystemTrayIcon,
+)
+from sync import forzar_sync
 
+from ui.bienvenida import PantallaBienvenida
+from ui.icono import cargar_icono_app
+from ui.log import log
 from ui.login import PantallaLogin
 from ui.registro import PantallaRegistro
-from ui.bienvenida import PantallaBienvenida
 from ui.sesion import VentanaSesion
-from ui.icono import cargar_icono_app
-from db.sesiones import guardar_sesion, actualizar_hora_fin
-from db.pin_admin import obtener_estado_pin, guardar_estado_pin
-from core.config import PC_ID, DURACION_SESION_MS, ADMIN_PIN_HASH, now_sv
-from core.pin_hash import verificar_pin, es_hash_legacy
-from sync import forzar_sync
-import core.estado as estado_mod
-from ui.log import log
 
 PANTALLA_LOGIN = 0
 PANTALLA_REGISTRO = 1
@@ -306,7 +313,7 @@ class VentanaKiosko(QMainWindow):
         log.info("Apagado del equipo solicitado desde login (admin)")
         self._preparar_apagado_o_reinicio()
         try:
-            subprocess.run(["systemctl", "poweroff"], check=True, timeout=10)
+            subprocess.run([shutil.which("systemctl") or "systemctl", "poweroff"], check=True, timeout=10)
         except Exception as exc:
             log.error("Error al apagar el equipo: %s", exc)
             QMessageBox.warning(self, "Error", "No se pudo apagar el equipo.")
@@ -317,7 +324,7 @@ class VentanaKiosko(QMainWindow):
         log.info("Reinicio del equipo solicitado desde login (admin)")
         self._preparar_apagado_o_reinicio()
         try:
-            subprocess.run(["systemctl", "reboot"], check=True, timeout=10)
+            subprocess.run([shutil.which("systemctl") or "systemctl", "reboot"], check=True, timeout=10)
         except Exception as exc:
             log.error("Error al reiniciar el equipo: %s", exc)
             QMessageBox.warning(self, "Error", "No se pudo reiniciar el equipo.")

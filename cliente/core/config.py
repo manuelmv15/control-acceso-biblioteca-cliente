@@ -1,6 +1,6 @@
+import configparser
 import os
 import uuid
-import configparser
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse

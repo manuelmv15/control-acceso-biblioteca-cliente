@@ -1,0 +1,13 @@
+# Mantiene al día PyQt6/requests/psutil/cryptography (sin Dockerfile en este
+# repo: el kiosko corre nativo en cada PC, ver README.md).
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/cliente"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

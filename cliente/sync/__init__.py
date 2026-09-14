@@ -3,17 +3,17 @@ import os
 import threading
 from pathlib import Path
 
-from core.config import PC_ID, PC_NOMBRE, SYNC_INTERVAL, SERVER_URL
-from db.sesiones import obtener_pendientes, marcar_sincronizado
+import core.estado as estado_mod
+from core.config import PC_ID, PC_NOMBRE, SERVER_URL, SYNC_INTERVAL
 from db.estudiantes import (
     buscar_estudiante_cache,
-    obtener_estudiantes_pendientes,
     marcar_estudiante_sincronizado,
+    obtener_estudiantes_pendientes,
 )
+from db.sesiones import marcar_sincronizado, obtener_pendientes
 from network.client import hay_conexion
-from network.sesiones import enviar_sesiones, enviar_estado
-from network.estudiantes import registrar_estudiante, actualizar_estudiante
-import core.estado as estado_mod
+from network.estudiantes import actualizar_estudiante, registrar_estudiante
+from network.sesiones import enviar_estado, enviar_sesiones
 
 LOG_FILE = Path(__file__).parent.parent / "sync.log"
 log = logging.getLogger("sync")
