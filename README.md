@@ -107,6 +107,9 @@ Pide nombre de PC (default `PC-01`), URL del servidor (default `http://localhost
 ```bash
 cd cliente
 pip install -r requirements.txt
+# Si falla con "externally-managed-environment" (PEP 668, común en distros
+# recientes con Python del sistema): pip install --break-system-packages -r requirements.txt
+# — justificado porque la PC es de uso dedicado (kiosko), ver docs/desarrollo/despliegue.md.
 python setup.py
 ```
 

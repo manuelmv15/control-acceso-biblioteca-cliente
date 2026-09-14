@@ -14,7 +14,18 @@ Este componente se instala **en cada PC de la sala** (kiosko). Requiere que `bib
 
 ```bash
 cd cliente
+pip install -r requirements.txt
+```
+
+Si falla con `error: externally-managed-environment` (PEP 668 — común en distros Linux recientes cuando se usa el Python del sistema en vez de un venv), reintentar con:
+
+```bash
 pip install --break-system-packages -r requirements.txt
+```
+
+Justificado porque cada PC hija es de uso dedicado (kiosko), no un entorno de desarrollo general — mismo criterio que aplica `cliente/autostart/actualizar_linux.sh` al actualizar.
+
+```bash
 python setup.py
 ```
 
@@ -147,13 +158,18 @@ Mejora futura (no bloqueante): reemplazar la sesión GNOME completa por un compo
 
 ## Orden de despliegue del sistema completo
 
+Ver la guía paso a paso completa (servidor + todas las PCs + cómo se conectan entre sí) en `biblioteca_servidor/docs/desarrollo/despliegue.md`, sección **Orden de despliegue del sistema completo**, o en `DESPLIEGUE.md` en la raíz del workspace si ambos repos están junto a él. Resumen mínimo:
+
 ```
-1. Desplegar biblioteca_servidor en la PC maestra
-2. Anotar IP local de la PC maestra
-3. En cada PC hija:
-      pip install -r requirements.txt
-      python setup.py
-4. Probar con 2-3 PCs antes de las 16
-5. Verificar en el panel admin que llegan las sesiones
-6. (Opcional) túnel Cloudflare para acceso externo al panel — ver biblioteca_servidor
+1. Desplegar biblioteca_servidor en la PC maestra (backend + MySQL)
+2. Anotar la IP LAN de la PC maestra (ip a) y decidir si se usa TLS (recomendado)
+3. En cada PC hija (repetir para las 16, empezando por 2-3 de prueba):
+   a. pip install -r requirements.txt (--break-system-packages si PEP 668)
+   b. python setup.py → nombre de PC, URL del servidor, ca.pem si hay TLS
+   c. En el panel del servidor (pestaña "PCs"), generar la API key para el
+      PC_ID que muestra setup.py, y pegarla cuando setup.py la pida
+   d. Instalar autostart cuando setup.py lo ofrezca
+4. Verificar en el panel admin (pestaña "PCs") que cada PC aparece y llegan
+   su heartbeat de estado y sus sesiones
+5. (Opcional) túnel Cloudflare para acceso externo al panel — ver biblioteca_servidor
 ```
