@@ -1,26 +1,35 @@
+import shutil
 import subprocess
+import time
 import uuid
 from datetime import date, datetime
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
-    QMainWindow, QStackedWidget, QApplication, QSystemTrayIcon, QMenu,
-    QInputDialog, QLineEdit, QMessageBox
-)
-from PyQt6.QtCore import Qt, QTimer, QKeyCombination
+import core.estado as estado_mod
+from core.config import ADMIN_PIN_HASH, DURACION_SESION_MS, PC_ID, now_sv
+from core.pin_hash import es_hash_legacy, verificar_pin
+from db.pin_admin import guardar_estado_pin, obtener_estado_pin
+from db.sesiones import actualizar_hora_fin, guardar_sesion
+from PyQt6.QtCore import QKeyCombination, Qt, QTimer
 from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtWidgets import (
+    QApplication,
+    QInputDialog,
+    QLineEdit,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QStackedWidget,
+    QSystemTrayIcon,
+)
+from sync import forzar_sync
 
+from ui.bienvenida import PantallaBienvenida
+from ui.icono import cargar_icono_app
+from ui.log import log
 from ui.login import PantallaLogin
 from ui.registro import PantallaRegistro
-from ui.bienvenida import PantallaBienvenida
 from ui.sesion import VentanaSesion
-from ui.icono import cargar_icono_app
-from db.sesiones import guardar_sesion, actualizar_hora_fin
-from core.config import PC_ID, DURACION_SESION_MS, ADMIN_PIN_HASH, now_sv
-from core.pin_hash import verificar_pin, es_hash_legacy
-from sync import forzar_sync
-import core.estado as estado_mod
-from ui.log import log
 
 PANTALLA_LOGIN = 0
 PANTALLA_REGISTRO = 1
@@ -35,6 +44,15 @@ SALIDA_SECRETA = QKeySequence(
     )
 )
 
+# Rate limiting del PIN de administrador local: sin esto, alguien con
+# acceso físico prolongado a un kiosko puede probar PINs manualmente sin
+# límite ni demora. Se persiste en la base local (tabla pin_admin_lockout,
+# ver db/pin_admin.py) para que reiniciar la app del kiosko no resetee el
+# contador de intentos fallidos — solo hay un teclado local frente a un
+# único diálogo, así que se guarda una sola fila por PC_ID.
+PIN_ADMIN_MAX_INTENTOS = 5
+PIN_ADMIN_BLOQUEO_SEGUNDOS = 5 * 60
+
 
 class VentanaKiosko(QMainWindow):
     def __init__(self):
@@ -44,6 +62,7 @@ class VentanaKiosko(QMainWindow):
         self._estudiante_activo: dict | None = None
         self._estudiante_mostrado: dict | None = None
         self._es_invitado: bool = False
+        self._pin_admin_fallos, self._pin_admin_bloqueado_hasta = obtener_estado_pin(PC_ID)
 
         self._timer_sesion = QTimer(self)
         self._timer_sesion.setSingleShot(True)
@@ -294,7 +313,7 @@ class VentanaKiosko(QMainWindow):
         log.info("Apagado del equipo solicitado desde login (admin)")
         self._preparar_apagado_o_reinicio()
         try:
-            subprocess.run(["systemctl", "poweroff"], check=True, timeout=10)
+            subprocess.run([shutil.which("systemctl") or "systemctl", "poweroff"], check=True, timeout=10)
         except Exception as exc:
             log.error("Error al apagar el equipo: %s", exc)
             QMessageBox.warning(self, "Error", "No se pudo apagar el equipo.")
@@ -305,7 +324,7 @@ class VentanaKiosko(QMainWindow):
         log.info("Reinicio del equipo solicitado desde login (admin)")
         self._preparar_apagado_o_reinicio()
         try:
-            subprocess.run(["systemctl", "reboot"], check=True, timeout=10)
+            subprocess.run([shutil.which("systemctl") or "systemctl", "reboot"], check=True, timeout=10)
         except Exception as exc:
             log.error("Error al reiniciar el equipo: %s", exc)
             QMessageBox.warning(self, "Error", "No se pudo reiniciar el equipo.")
@@ -319,6 +338,16 @@ class VentanaKiosko(QMainWindow):
         self.tray.hide()
 
     def _verificar_pin_admin(self) -> bool:
+        restante = self._pin_admin_bloqueado_hasta - time.time()
+        if restante > 0:
+            minutos = int(restante // 60) + 1
+            log.warning("Salida admin bloqueada: PIN bloqueado por %d intentos fallidos (%d min restantes)",
+                        self._pin_admin_fallos, minutos)
+            QMessageBox.warning(
+                self, "PIN bloqueado",
+                f"Demasiados intentos fallidos. Esperá {minutos} minuto(s) antes de volver a intentar."
+            )
+            return False
         if not ADMIN_PIN_HASH:
             log.warning("Salida admin bloqueada: sin PIN configurado")
             QMessageBox.warning(
@@ -328,9 +357,9 @@ class VentanaKiosko(QMainWindow):
             )
             return False
         if es_hash_legacy(ADMIN_PIN_HASH):
-            # Hash del formato viejo (SHA-256 plano sin sal, previo a H4 de
-            # AUDITORIA.md) — no se puede migrar en caliente sin conocer el
-            # PIN en texto plano, así que se bloquea y se pide reconfigurar.
+            # Hash del formato viejo (SHA-256 plano sin sal) — no se puede
+            # migrar en caliente sin conocer el PIN en texto plano, así que
+            # se bloquea y se pide reconfigurar.
             log.warning("Salida admin bloqueada: pin_hash en formato legacy, requiere reconfigurar")
             QMessageBox.warning(
                 self, "Reconfiguración requerida",
@@ -347,9 +376,26 @@ class VentanaKiosko(QMainWindow):
             return False
         if verificar_pin(pin, ADMIN_PIN_HASH):
             log.info("Salida admin autorizada (PIN correcto)")
+            self._pin_admin_fallos = 0
+            self._pin_admin_bloqueado_hasta = 0.0
+            guardar_estado_pin(PC_ID, self._pin_admin_fallos, self._pin_admin_bloqueado_hasta)
             return True
-        log.warning("Salida admin denegada: PIN incorrecto")
-        QMessageBox.warning(self, "PIN incorrecto", "El PIN ingresado no es válido.")
+        self._pin_admin_fallos += 1
+        log.warning("Salida admin denegada: PIN incorrecto (intento %d/%d)",
+                    self._pin_admin_fallos, PIN_ADMIN_MAX_INTENTOS)
+        if self._pin_admin_fallos >= PIN_ADMIN_MAX_INTENTOS:
+            self._pin_admin_bloqueado_hasta = time.time() + PIN_ADMIN_BLOQUEO_SEGUNDOS
+            log.warning("PIN de administrador bloqueado por %d minutos tras exceder intentos",
+                        PIN_ADMIN_BLOQUEO_SEGUNDOS // 60)
+            guardar_estado_pin(PC_ID, self._pin_admin_fallos, self._pin_admin_bloqueado_hasta)
+            QMessageBox.warning(
+                self, "PIN bloqueado",
+                f"Demasiados intentos fallidos. El PIN quedó bloqueado por "
+                f"{PIN_ADMIN_BLOQUEO_SEGUNDOS // 60} minutos."
+            )
+        else:
+            guardar_estado_pin(PC_ID, self._pin_admin_fallos, self._pin_admin_bloqueado_hasta)
+            QMessageBox.warning(self, "PIN incorrecto", "El PIN ingresado no es válido.")
         return False
 
     def closeEvent(self, event):

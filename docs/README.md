@@ -1,5 +1,6 @@
 # Documentación — Biblioteca Cliente
 
+- **Guía de despliegue del sistema completo (servidor + todas las PCs, paso a paso)** → [`../../DESPLIEGUE.md`](../../DESPLIEGUE.md)
 - **Para estudiantes/usuarios del kiosko** → [`usuario.md`](./usuario.md)
 - **Para desarrolladores:**
   - [`desarrollo/despliegue.md`](./desarrollo/despliegue.md) — cómo instalar en una PC nueva, autostart en Linux, checklist antes de producción

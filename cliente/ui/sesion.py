@@ -1,9 +1,16 @@
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QSpacerItem, QSizePolicy
-)
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from datetime import datetime
+
 from core.config import now_sv
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtWidgets import (
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QVBoxLayout,
+    QWidget,
+)
+
 from ui.icono import cargar_icono_app
 
 

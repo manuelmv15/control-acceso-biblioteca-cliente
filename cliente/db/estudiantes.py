@@ -1,3 +1,4 @@
+from db.cifrado import cifrar_estudiante, descifrar_estudiante
 from db.connection import get_connection
 
 
@@ -7,7 +8,7 @@ def guardar_estudiante_cache(est: dict, sincronizado: int = 1, pendiente_modo: s
         INSERT OR REPLACE INTO estudiantes_cache
             (carnet, nombre, carrera, facultad, fecha_nacimiento, sexo, sincronizado, pendiente_modo)
         VALUES (:carnet, :nombre, :carrera, :facultad, :fecha_nacimiento, :sexo, :sincronizado, :pendiente_modo)
-    """, {**est, "sincronizado": sincronizado, "pendiente_modo": pendiente_modo})
+    """, {**cifrar_estudiante(est), "sincronizado": sincronizado, "pendiente_modo": pendiente_modo})
     conn.commit()
     conn.close()
 
@@ -18,7 +19,7 @@ def buscar_estudiante_cache(carnet: str) -> dict | None:
         "SELECT * FROM estudiantes_cache WHERE carnet = ?", (carnet,)
     ).fetchone()
     conn.close()
-    return dict(row) if row else None
+    return descifrar_estudiante(dict(row)) if row else None
 
 
 def obtener_estudiantes_pendientes() -> list:
@@ -27,7 +28,7 @@ def obtener_estudiantes_pendientes() -> list:
         "SELECT * FROM estudiantes_cache WHERE sincronizado = 0"
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    return [descifrar_estudiante(dict(r)) for r in rows]
 
 
 def marcar_estudiante_sincronizado(carnet: str):

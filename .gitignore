@@ -16,6 +16,9 @@ env/
 *.sqlite
 *.sqlite3
 
+# Clave de cifrado de estudiantes_cache (db/cifrado.py) — nunca versionar
+cliente/db_key.bin
+
 # Logs
 *.log
 sync.log

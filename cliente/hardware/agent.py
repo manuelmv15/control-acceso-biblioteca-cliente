@@ -1,9 +1,11 @@
 import logging
+import os
 import threading
 from pathlib import Path
 
-from core.config import PC_ID, HARDWARE_INTERVAL_SEGUNDOS, now_sv
+from core.config import HARDWARE_INTERVAL_SEGUNDOS, PC_ID, now_sv
 from network.hardware import enviar_hardware
+
 from hardware import collector, mantenimiento
 
 LOG_FILE = Path(__file__).parent.parent / "hardware.log"
@@ -15,6 +17,8 @@ if not log.handlers:
     for _handler in (logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler()):
         _handler.setFormatter(_formatter)
         log.addHandler(_handler)
+    if LOG_FILE.exists():
+        os.chmod(LOG_FILE, 0o600)
 
 _wake = threading.Event()
 

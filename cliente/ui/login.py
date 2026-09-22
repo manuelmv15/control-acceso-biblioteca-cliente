@@ -1,12 +1,20 @@
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpacerItem, QSizePolicy
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QRegularExpression
-from PyQt6.QtGui import QPixmap, QRegularExpressionValidator
 from pathlib import Path
 
-from ui.log import log
 from core.validacion import CARNET_PLACEHOLDER, carnet_valido, normalizar_carnet
+from PyQt6.QtCore import QRegularExpression, Qt, pyqtSignal
+from PyQt6.QtGui import QPixmap, QRegularExpressionValidator
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ui.log import log
 
 
 class PantallaLogin(QWidget):
@@ -109,8 +117,8 @@ class PantallaLogin(QWidget):
 
     def _intentar_login(self):
         from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache
-        from network.estudiantes import obtener_estudiante
         from network.client import hay_conexion
+        from network.estudiantes import obtener_estudiante
 
         carnet = normalizar_carnet(self.carnet_input.text())
         if not carnet:

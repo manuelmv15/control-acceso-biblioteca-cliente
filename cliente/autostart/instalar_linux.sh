@@ -84,3 +84,13 @@ SEOF
     echo "Servicio systemd instalado"
     echo "Para desinstalar: sudo systemctl disable biblioteca-kiosko && sudo rm $SERVICE_FILE"
 fi
+
+echo ""
+# Bloqueo de escritorio a nivel de sistema: sin esto, el bloqueo de
+# core/bloqueo_escritorio.py (dconf de usuario) es reversible por
+# cualquiera que consiga una terminal en la misma sesión del kiosko, y
+# desde ahí quedan alcanzables tanto el código como config.ini.
+read -rp "¿Aplicar también el bloqueo de escritorio a nivel de sistema (dconf con locks + TTY — recomendado para producción)? [s/N]: " resp
+if [[ "${resp,,}" == "s" ]]; then
+    "$SCRIPT_DIR/bloquear_sistema_linux.sh"
+fi

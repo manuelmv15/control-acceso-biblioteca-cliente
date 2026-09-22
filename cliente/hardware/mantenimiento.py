@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from core.config import TZ_SV, now_sv
 import db.hardware as db_hardware
+from core.config import TZ_SV, now_sv
 
 UMBRAL_PENDIENTE_HORAS = 300
 UMBRAL_CRITICO_HORAS = 400

@@ -1,0 +1,4 @@
+# Solo para empaquetar el binario (build.spec) en CI o a mano -- no se
+# necesita para desarrollo ni para correr los tests (requirements-dev.txt).
+-r requirements.txt
+pyinstaller==6.22.3

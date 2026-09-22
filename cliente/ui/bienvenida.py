@@ -1,9 +1,8 @@
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QSpacerItem, QSizePolicy
-)
-from PyQt6.QtCore import Qt, QTimer
 from datetime import datetime
+
 from core.config import now_sv
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import QLabel, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
 
 class PantallaBienvenida(QWidget):

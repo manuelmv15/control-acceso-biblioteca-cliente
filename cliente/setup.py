@@ -1,10 +1,11 @@
 """Script de configuración inicial — ejecutar una vez por PC hija."""
 import configparser
 import getpass
-import subprocess
-import uuid
-import sys
 import os
+import shutil
+import subprocess
+import sys
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -14,7 +15,7 @@ PC_ID_FILE = BASE_DIR / ".pc_id"
 
 # Hace falta antes de poder importar core.pin_hash (paquete del propio proyecto).
 sys.path.insert(0, str(BASE_DIR))
-from core.pin_hash import generar_hash_pin, LONGITUD_MINIMA_PIN  # noqa: E402
+from core.pin_hash import LONGITUD_MINIMA_PIN, generar_hash_pin  # noqa: E402
 
 
 def preguntar(prompt: str, default: str = "") -> str:
@@ -68,8 +69,8 @@ def preguntar_ca_cert(server_url: str) -> str:
 
 
 def preguntar_admin_pin() -> str:
-    """Devuelve el hash PBKDF2 del PIN de administrador (ver core/pin_hash.py,
-    H4 de AUDITORIA.md), o "" si se deja sin configurar (bloquea 'Salir
+    """Devuelve el hash PBKDF2 del PIN de administrador (ver core/pin_hash.py),
+    o "" si se deja sin configurar (bloquea 'Salir
     (admin)' hasta que se configure). Exige una longitud mínima: un PIN de
     1-3 dígitos es trivial de adivinar por fuerza bruta en la UI misma, sin
     ni siquiera necesitar el hash filtrado."""
@@ -135,10 +136,15 @@ Terminal=false
 Categories=Utility;
 """)
     print(f"  Entrada de aplicación creada: {apps_desktop_file}")
-    subprocess.run(
-        ["update-desktop-database", str(apps_dir)],
-        capture_output=True, check=False,
-    )
+    # Best-effort: solo refresca la caché de íconos/menú. En algunos entornos
+    # mínimos el binario ni siquiera existe, así que se verifica antes en vez
+    # de dejar que un FileNotFoundError tumbe el resto del setup.
+    update_desktop_db_bin = shutil.which("update-desktop-database")
+    if update_desktop_db_bin:
+        subprocess.run(
+            [update_desktop_db_bin, str(apps_dir)],
+            capture_output=True, check=False,
+        )
 
 
 def main():
@@ -147,7 +153,21 @@ def main():
     nombre = preguntar("Nombre de esta PC (ej: PC-01)", "PC-01")
     server_url, permitir_http_inseguro = preguntar_server_url()
     ca_cert = preguntar_ca_cert(server_url)
-    kiosk_key = preguntar("API key de kiosko (la misma KIOSK_API_KEY del servidor)", "")
+
+    # El PC_ID identifica a esta PC ante el servidor: hace falta generarlo (o
+    # leer el existente) antes de pedir la API key, porque el admin la genera
+    # desde el panel para este PC_ID puntual (pestaña "PCs" -> "Generar API
+    # key" -> PUT /pcs/{pc_id}/api-key), no un valor compartido con las demás.
+    pc_id = generar_pc_id()
+    print(
+        f"\n  Este PC_ID ({pc_id}) es el que hay que darle a quien administra "
+        "el panel para que genere la API key de esta PC específica."
+    )
+    kiosk_key = preguntar(
+        "API key de esta PC (generada desde el panel admin para el PC_ID de "
+        "arriba; se ve una sola vez ahí, así que copiala ahora)",
+        "",
+    )
     admin_pin_hash = preguntar_admin_pin()
 
     config = configparser.ConfigParser()
@@ -163,13 +183,8 @@ def main():
 
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         config.write(f)
-    # config.ini guarda la API key de kiosko y el hash del PIN de admin en texto
-    # plano; restringir el acceso al dueño del proceso evita que otras cuentas
-    # locales de esta PC puedan leerlos.
-    os.chmod(CONFIG_FILE, 0o600)
+    os.chmod(CONFIG_FILE, 0o600)  # KIOSK_API_KEY y pin_hash: solo el dueño del proceso
     print(f"\nConfig guardada: {CONFIG_FILE}")
-
-    pc_id = generar_pc_id()
 
     # Crear DB local (sys.path ya tiene BASE_DIR, insertado arriba para core.pin_hash)
     from db import init_db
@@ -182,7 +197,7 @@ def main():
         app_main = str(BASE_DIR / "main.py")
         instalar_autostart_linux(app_main)
 
-    print(f"\n=== Configuración completa ===")
+    print("\n=== Configuración completa ===")
     print(f"  PC: {nombre}")
     print(f"  ID: {pc_id}")
     print(f"  Servidor: {server_url}")
@@ -190,7 +205,7 @@ def main():
         print("  ⚠️  Sin API key de kiosko: el login/registro de estudiantes fallará (401) hasta que la configures en config.ini")
     if not admin_pin_hash:
         print("  ⚠️  Sin PIN de administrador: 'Salir (admin)' quedará bloqueado hasta que configures [admin] pin_hash en config.ini")
-    print(f"\nEjecutar: python main.py")
+    print("\nEjecutar: python main.py")
 
 
 if __name__ == "__main__":

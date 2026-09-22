@@ -69,13 +69,14 @@ def salud() -> dict:
             pass
 
     disco_smart_ok = None
-    if shutil.which("smartctl"):
+    smartctl_bin = shutil.which("smartctl")
+    if smartctl_bin:
         for disco in DISCOS_CANDIDATOS:
             if not Path(disco).exists():
                 continue
             try:
                 r = subprocess.run(
-                    ["smartctl", "-H", disco],
+                    [smartctl_bin, "-H", disco],
                     capture_output=True, text=True, timeout=5,
                 )
                 # returncode != 0 cubre "permission denied"/dispositivo no

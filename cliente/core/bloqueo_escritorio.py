@@ -13,12 +13,14 @@ disponible, o alguna clave no existe en la versión instalada de GNOME
 Shell, se ignora esa clave puntual y se sigue con las demás. Nunca debe
 impedir que el kiosko arranque.
 
-Limitación conocida (ver README): esto deshabilita las claves para el
-usuario actual vía dconf de usuario, no las bloquea a nivel de sistema
+Limitación conocida: esto deshabilita las claves para el usuario actual
+vía dconf de usuario, no las bloquea a nivel de sistema
 (`/etc/dconf/db/.../locks`). Alguien con una terminal como ese mismo
 usuario podría revertirlas con `gsettings set` — se reaplican en cada
 arranque del kiosko, pero no dentro de una sesión ya abierta. Para un
-bloqueo que sobreviva a eso, ver la sección correspondiente del README.
+bloqueo que sobreviva a eso (dconf de sistema con locks + endurecimiento
+de BIOS/TTY), ver docs/desarrollo/despliegue.md, sección "Bloqueo de
+escritorio para producción"
 """
 import os
 import shutil
@@ -55,10 +57,10 @@ def _es_gnome() -> bool:
     return "gnome" in entorno
 
 
-def _set(esquema: str, clave: str, valor: str) -> bool:
+def _set(gsettings_bin: str, esquema: str, clave: str, valor: str) -> bool:
     try:
         r = subprocess.run(
-            ["gsettings", "set", esquema, clave, valor],
+            [gsettings_bin, "set", esquema, clave, valor],
             capture_output=True, text=True, timeout=5,
         )
         if r.returncode != 0:
@@ -79,7 +81,8 @@ def aplicar():
             os.environ.get("XDG_CURRENT_DESKTOP", ""),
         )
         return
-    if not shutil.which("gsettings"):
+    gsettings_bin = shutil.which("gsettings")
+    if not gsettings_bin:
         log.warning("Bloqueo de atajos: gsettings no está disponible, omitido")
         return
 
@@ -87,13 +90,13 @@ def aplicar():
 
     # overlay-key es un string (no un arreglo): '' deshabilita la tecla
     # Super como atajo de "Actividades" (default de fábrica: 'Super_L').
-    if _set("org.gnome.mutter", "overlay-key", "''"):
+    if _set(gsettings_bin, "org.gnome.mutter", "overlay-key", "''"):
         aplicadas += 1
     else:
         fallidas.append("org.gnome.mutter.overlay-key")
 
     for esquema, clave in _CLAVES_A_VACIAR:
-        if _set(esquema, clave, "[]"):
+        if _set(gsettings_bin, esquema, clave, "[]"):
             aplicadas += 1
         else:
             fallidas.append(f"{esquema}.{clave}")
