@@ -163,6 +163,10 @@ def main():
 
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         config.write(f)
+    # config.ini guarda la API key de kiosko y el hash del PIN de admin en texto
+    # plano; restringir el acceso al dueño del proceso evita que otras cuentas
+    # locales de esta PC puedan leerlos.
+    os.chmod(CONFIG_FILE, 0o600)
     print(f"\nConfig guardada: {CONFIG_FILE}")
 
     pc_id = generar_pc_id()

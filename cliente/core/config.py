@@ -19,6 +19,15 @@ PC_ID_FILE = BASE_DIR / ".pc_id"
 _config = configparser.ConfigParser()
 _config.read(CONFIG_FILE, encoding="utf-8")
 
+# config.ini guarda la API key de kiosko y el hash del PIN de admin en texto
+# plano; cubre instalaciones existentes cuyo config.ini se creó antes de que
+# setup.py empezara a fijar el permiso al escribirlo.
+if CONFIG_FILE.exists():
+    try:
+        os.chmod(CONFIG_FILE, 0o600)
+    except OSError:
+        pass
+
 
 def _get(section, key, env_var=None, default=""):
     if env_var and os.environ.get(env_var):
