@@ -129,7 +129,14 @@ class PantallaLogin(QWidget):
 
         try:
             est = servicio.llamar("buscar_estudiante", carnet=carnet)
-        except (servicio.ServicioNoDisponible, servicio.ErrorServicio) as exc:
+        except servicio.ErrorServicio as exc:
+            log.error("No se pudo buscar el carnet: %s", exc)
+            if exc.codigo == "servidor_no_disponible":
+                self.lbl_error.setText("No se pudo consultar el servidor. Intente de nuevo en unos segundos.")
+            else:
+                self.lbl_error.setText("El sistema no está disponible. Intente de nuevo en unos segundos.")
+            return
+        except servicio.ServicioNoDisponible as exc:
             log.error("No se pudo buscar el carnet: %s", exc)
             self.lbl_error.setText("El sistema no está disponible. Intente de nuevo en unos segundos.")
             return

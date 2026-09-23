@@ -15,12 +15,14 @@ from collections.abc import Callable
 from datetime import date
 
 import core.estado as estado_mod
+from core.estudiantes_sync import reemplazar_con_ficha_del_servidor
 from core.pin_hash import es_hash_legacy, verificar_pin
 from core.tiempo import now_sv
 from core.validacion import carnet_valido, normalizar_carnet
-from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache
+from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache, guardar_estudiante_del_servidor
 from db.pin_admin import guardar_estado_pin, obtener_estado_pin
 from db.sesiones import actualizar_hora_fin, guardar_sesion
+from network.errores import CarnetYaRegistrado, ServidorNoDisponible
 
 log = logging.getLogger("servicio")
 
@@ -111,18 +113,25 @@ class ServicioKiosko:
 
     def _buscar(self, carnet: str) -> dict | None:
         """Caché local primero; si no está y hay conexión, el servidor (y se
-        cachea la respuesta para la próxima vez o para cuando no haya red)."""
+        cachea la respuesta para la próxima vez o para cuando no haya red).
+
+        Si hay conexión pero el servidor no contesta (timeout, 429, 5xx) se
+        lanza "servidor_no_disponible" en vez de devolver None: un «no
+        existe» falso llevaba al estudiante a registrar de nuevo un carnet
+        que ya estaba en el servidor."""
         est = buscar_estudiante_cache(carnet)
         if est:
             return est
         if not self._red.hay_conexion():
             return None
-        datos = self._red.obtener_estudiante(carnet)
+        try:
+            datos = self._red.obtener_estudiante(carnet)
+        except ServidorNoDisponible as exc:
+            log.warning("No se pudo consultar el carnet %s en el servidor: %s", carnet, exc)
+            raise ErrorOperacion("servidor_no_disponible", "no se pudo consultar el servidor") from exc
         if not datos:
             return None
-        est = {**_publico(datos), "carnet": datos.get("carnet") or carnet}
-        guardar_estudiante_cache(est)
-        return est
+        return guardar_estudiante_del_servidor(carnet, datos)
 
     def buscar_estudiante(self, carnet) -> dict | None:
         carnet = _carnet(carnet)
@@ -176,7 +185,13 @@ class ServicioKiosko:
             if modo == "actualizar":
                 ok = self._red.actualizar_estudiante(carnet, envio)
             else:
-                ok = self._red.registrar_estudiante(envio)
+                try:
+                    ok = self._red.registrar_estudiante(envio)
+                except CarnetYaRegistrado:
+                    # Se registró desde otra PC entre la consulta y el alta:
+                    # se cachea la ficha del servidor, no la que se tecleó.
+                    reemplazar_con_ficha_del_servidor(self._red, carnet)
+                    raise ErrorOperacion("carnet_duplicado", "este carnet ya está registrado") from None
             estado = "sincronizado" if ok else "pendiente_error"
         else:
             estado = "pendiente_sin_conexion"

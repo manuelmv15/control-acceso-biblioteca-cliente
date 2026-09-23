@@ -19,6 +19,7 @@ import core.pin_hash as pin_hash
 import pytest
 from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache, obtener_estudiantes_pendientes
 from db.sesiones import obtener_pendientes
+from network.errores import CarnetYaRegistrado, ServidorNoDisponible
 from servicio import servidor as servidor_mod
 from servicio.operaciones import PIN_ADMIN_MAX_INTENTOS, ErrorOperacion, ServicioKiosko
 from servicio.servidor import ServidorKiosko, despachar, peer_autorizado
@@ -35,10 +36,16 @@ ESTUDIANTE = {
 
 
 class RedFalsa:
-    def __init__(self, conectado=True, en_servidor=None, acepta=True):
+    """`caido`: hay conexión pero GET /estudiantes no contesta (timeout,
+    429, 5xx). `oculta`: carnets que el GET no ve pero el POST rechaza con
+    409, como cuando otra PC los registra entre la consulta y el alta."""
+
+    def __init__(self, conectado=True, en_servidor=None, acepta=True, caido=False, oculta=None):
         self.conectado = conectado
         self.en_servidor = dict(en_servidor or {})
         self.acepta = acepta
+        self.caido = caido
+        self.oculta = dict(oculta or {})
         self.consultas = []
         self.registrados = []
         self.actualizados = []
@@ -48,10 +55,16 @@ class RedFalsa:
 
     def obtener_estudiante(self, carnet):
         self.consultas.append(carnet)
+        if self.caido:
+            raise ServidorNoDisponible("HTTP 429")
         return self.en_servidor.get(carnet)
 
     def registrar_estudiante(self, datos):
         self.registrados.append(datos)
+        if datos["carnet"] in self.oculta:
+            self.en_servidor[datos["carnet"]] = self.oculta.pop(datos["carnet"])
+        if datos["carnet"] in self.en_servidor:
+            raise CarnetYaRegistrado(datos["carnet"])
         return self.acepta
 
     def actualizar_estudiante(self, carnet, datos):
@@ -144,6 +157,32 @@ def test_registrar_carnet_existente_se_rechaza(db_temporal):
         _servicio(red).guardar_estudiante("crear", {**ESTUDIANTE, "nombre": "Otra persona"})
     assert exc.value.codigo == "carnet_duplicado"
     assert red.registrados == []
+
+
+def test_buscar_con_servidor_caido_no_se_toma_como_inexistente(db_temporal):
+    with pytest.raises(ErrorOperacion) as exc:
+        _servicio(RedFalsa(caido=True)).buscar_estudiante("AB12345")
+    assert exc.value.codigo == "servidor_no_disponible"
+
+
+def test_registrar_con_servidor_caido_no_queda_pendiente(db_temporal):
+    """Si no se pudo comprobar que el carnet es nuevo, no se guarda nada:
+    dejarlo pendiente terminaba pisando la ficha real del estudiante."""
+    red = RedFalsa(caido=True)
+    with pytest.raises(ErrorOperacion) as exc:
+        _servicio(red).guardar_estudiante("crear", ESTUDIANTE)
+    assert exc.value.codigo == "servidor_no_disponible"
+    assert red.registrados == []
+    assert buscar_estudiante_cache("AB12345") is None
+
+
+def test_registrar_carnet_dado_de_alta_en_otra_pc_cachea_la_ficha_del_servidor(db_temporal):
+    red = RedFalsa(oculta={"AB12345": ESTUDIANTE})
+    with pytest.raises(ErrorOperacion) as exc:
+        _servicio(red).guardar_estudiante("crear", {**ESTUDIANTE, "nombre": "Otra persona"})
+    assert exc.value.codigo == "carnet_duplicado"
+    cache = buscar_estudiante_cache("AB12345")
+    assert cache["nombre"] == "Ana Pérez" and cache["sincronizado"] == 1
 
 
 @pytest.mark.parametrize("cambio", [

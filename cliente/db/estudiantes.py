@@ -39,3 +39,15 @@ def marcar_estudiante_sincronizado(carnet: str):
     )
     conn.commit()
     conn.close()
+
+
+CAMPOS_ESTUDIANTE = ("carnet", "nombre", "carrera", "facultad", "fecha_nacimiento", "sexo")
+
+
+def guardar_estudiante_del_servidor(carnet: str, datos: dict) -> dict:
+    """Cachea la ficha tal como la tiene el servidor, marcada como
+    sincronizada, y descarta lo que hubiera en local para ese carnet."""
+    est = {campo: datos.get(campo) or "" for campo in CAMPOS_ESTUDIANTE}
+    est["carnet"] = datos.get("carnet") or carnet
+    guardar_estudiante_cache(est)
+    return est

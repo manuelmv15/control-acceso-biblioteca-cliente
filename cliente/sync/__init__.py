@@ -4,16 +4,13 @@ import threading
 
 import core.estado as estado_mod
 from core.config import PC_ID, PC_NOMBRE, SERVER_URL, SYNC_INTERVAL
+from core.estudiantes_sync import sincronizar_pendientes
 from core.lotes_sync import enviar_por_lotes
 from core.rutas import DATA_DIR
-from db.estudiantes import (
-    buscar_estudiante_cache,
-    marcar_estudiante_sincronizado,
-    obtener_estudiantes_pendientes,
-)
+from db.estudiantes import buscar_estudiante_cache
 from db.sesiones import marcar_rechazada, marcar_sincronizado, obtener_pendientes
+from network import estudiantes as red_estudiantes
 from network.client import hay_conexion
-from network.estudiantes import actualizar_estudiante, registrar_estudiante
 from network.sesiones import enviar_estado, enviar_sesiones
 
 LOG_FILE = DATA_DIR / "sync.log"
@@ -34,20 +31,15 @@ _wake = threading.Event()
 def _sincronizar_estudiantes_pendientes():
     """Reenvía al servidor los registros/actualizaciones de estudiantes que
     se guardaron localmente sin conexión (ver ui/registro.py)."""
-    pendientes = obtener_estudiantes_pendientes()
-    if not pendientes:
+    resultado = sincronizar_pendientes(red_estudiantes)
+    if not resultado.pendientes:
         return
-    sincronizados = 0
-    for est in pendientes:
-        modo = est.get("pendiente_modo") or "crear"
-        if modo == "actualizar":
-            ok = actualizar_estudiante(est["carnet"], est) or registrar_estudiante(est)
-        else:
-            ok = registrar_estudiante(est)
-        if ok:
-            marcar_estudiante_sincronizado(est["carnet"])
-            sincronizados += 1
-    log.info(f"Estudiantes pendientes: {sincronizados}/{len(pendientes)} sincronizados")
+    for carnet in resultado.reemplazados:
+        log.warning(f"El carnet {carnet} ya estaba registrado en el servidor; se descartan los datos locales")
+    log.info(
+        f"Estudiantes pendientes: {resultado.sincronizados}/{resultado.pendientes} sincronizados, "
+        f"{len(resultado.reemplazados)} reemplazados por la ficha del servidor"
+    )
 
 
 def _ejecutar_ciclo():

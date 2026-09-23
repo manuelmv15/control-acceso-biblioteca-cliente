@@ -368,6 +368,8 @@ class PantallaRegistro(QWidget):
                 self.lbl_error.setText("Este carnet ya está registrado. Inicie sesión con su carnet.")
             elif exc.codigo == "sin_permiso":
                 self.lbl_error.setText("Solo puede actualizar sus datos durante su propia sesión.")
+            elif exc.codigo == "servidor_no_disponible":
+                self.lbl_error.setText("No se pudo verificar el carnet con el servidor. Intente de nuevo en unos segundos.")
             else:
                 log.error("Registro rechazado por el servicio: %s", exc)
                 self.lbl_error.setText("Datos inválidos. Revise el formulario.")
