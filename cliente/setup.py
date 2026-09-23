@@ -10,12 +10,17 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).parent
-CONFIG_FILE = BASE_DIR / "config.ini"
-PC_ID_FILE = BASE_DIR / ".pc_id"
 
-# Hace falta antes de poder importar core.pin_hash (paquete del propio proyecto).
+# Hace falta antes de poder importar core.* (paquetes del propio proyecto).
 sys.path.insert(0, str(BASE_DIR))
 from core.pin_hash import LONGITUD_MINIMA_PIN, generar_hash_pin  # noqa: E402
+from core.rutas import DATA_DIR  # noqa: E402
+
+# config.ini y .pc_id van al directorio de datos del servicio
+# (BIBLIOTECA_DATA_DIR, o junto al código si no está definida), que es el
+# único proceso que los lee — ver core/rutas.py.
+CONFIG_FILE = DATA_DIR / "config.ini"
+PC_ID_FILE = DATA_DIR / ".pc_id"
 
 
 def preguntar(prompt: str, default: str = "") -> str:
@@ -149,6 +154,7 @@ Categories=Utility;
 
 def main():
     print("=== Configuración de PC Biblioteca ===\n")
+    DATA_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
 
     nombre = preguntar("Nombre de esta PC (ej: PC-01)", "PC-01")
     server_url, permitir_http_inseguro = preguntar_server_url()
@@ -205,7 +211,9 @@ def main():
         print("  ⚠️  Sin API key de kiosko: el login/registro de estudiantes fallará (401) hasta que la configures en config.ini")
     if not admin_pin_hash:
         print("  ⚠️  Sin PIN de administrador: 'Salir (admin)' quedará bloqueado hasta que configures [admin] pin_hash en config.ini")
-    print("\nEjecutar: python main.py")
+    print("\nEjecutar, en este orden y desde cliente/:")
+    print("  python -m servicio   # servicio en segundo plano (config.ini, base local, sync)")
+    print("  python main.py       # interfaz del kiosko")
 
 
 if __name__ == "__main__":

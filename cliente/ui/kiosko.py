@@ -1,15 +1,9 @@
 import shutil
 import subprocess
-import time
-import uuid
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
-import core.estado as estado_mod
-from core.config import ADMIN_PIN_HASH, DURACION_SESION_MS, PC_ID, now_sv
-from core.pin_hash import es_hash_legacy, verificar_pin
-from db.pin_admin import guardar_estado_pin, obtener_estado_pin
-from db.sesiones import actualizar_hora_fin, guardar_sesion
+from core.tiempo import now_sv
 from PyQt6.QtCore import QKeyCombination, Qt, QTimer
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
@@ -22,8 +16,8 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QSystemTrayIcon,
 )
-from sync import forzar_sync
 
+from ui import servicio
 from ui.bienvenida import PantallaBienvenida
 from ui.icono import cargar_icono_app
 from ui.log import log
@@ -44,14 +38,9 @@ SALIDA_SECRETA = QKeySequence(
     )
 )
 
-# Rate limiting del PIN de administrador local: sin esto, alguien con
-# acceso físico prolongado a un kiosko puede probar PINs manualmente sin
-# límite ni demora. Se persiste en la base local (tabla pin_admin_lockout,
-# ver db/pin_admin.py) para que reiniciar la app del kiosko no resetee el
-# contador de intentos fallidos — solo hay un teclado local frente a un
-# único diálogo, así que se guarda una sola fila por PC_ID.
-PIN_ADMIN_MAX_INTENTOS = 5
-PIN_ADMIN_BLOQUEO_SEGUNDOS = 5 * 60
+# Solo se usa si el servicio no responde al abrir la sesión, para no dejar
+# el temporizador sin valor; la duración real la fija el servicio.
+DURACION_SESION_MS_POR_DEFECTO = 60 * 60 * 1000
 
 
 class VentanaKiosko(QMainWindow):
@@ -62,7 +51,7 @@ class VentanaKiosko(QMainWindow):
         self._estudiante_activo: dict | None = None
         self._estudiante_mostrado: dict | None = None
         self._es_invitado: bool = False
-        self._pin_admin_fallos, self._pin_admin_bloqueado_hasta = obtener_estado_pin(PC_ID)
+        self._duracion_sesion_ms: int = DURACION_SESION_MS_POR_DEFECTO
 
         self._timer_sesion = QTimer(self)
         self._timer_sesion.setSingleShot(True)
@@ -148,7 +137,7 @@ class VentanaKiosko(QMainWindow):
             4000,
         )
         self.ventana_sesion.iniciar_sesion(
-            self._estudiante_mostrado, self._sesion_inicio, DURACION_SESION_MS, self._es_invitado
+            self._estudiante_mostrado, self._sesion_inicio, self._duracion_sesion_ms, self._es_invitado
         )
 
     # ── Eventos de sesión ────────────────────────────────────────────────
@@ -156,37 +145,31 @@ class VentanaKiosko(QMainWindow):
     def _on_login(self, estudiante: dict | None, etiqueta_sector: str = ""):
         """estudiante=None representa un acceso sin registro (sector no
         estudiantil): sin carnet ni datos personales, misma duración de
-        sesión que un estudiante."""
-        ahora = now_sv()
-        self._sesion_activa_id = str(uuid.uuid4())
+        sesión que un estudiante. El servicio registra la sesión, fija su
+        hora de inicio y su duración y reporta el estado al servidor."""
+        try:
+            if estudiante:
+                sesion = servicio.llamar("abrir_sesion", carnet=estudiante["carnet"])
+            else:
+                sesion = servicio.llamar("abrir_sesion", sector=etiqueta_sector)
+        except (servicio.ServicioNoDisponible, servicio.ErrorServicio) as exc:
+            log.error("No se pudo abrir la sesión: %s", exc)
+            QMessageBox.warning(
+                self, "Sistema no disponible",
+                "No se pudo iniciar la sesión. Intente de nuevo en unos segundos."
+            )
+            self._mostrar_login()
+            return
+
+        ahora = datetime.fromisoformat(sesion["hora_inicio"])
+        self._sesion_activa_id = sesion["sesion_id"]
         self._sesion_inicio = ahora
-        self._estudiante_activo = estudiante
-        self._es_invitado = estudiante is None
+        self._duracion_sesion_ms = sesion["duracion_sesion_ms"]
+        self._estudiante_activo = sesion["estudiante"]
+        self._es_invitado = sesion["estudiante"] is None
+        log.info("Sesión iniciada (%s)", "invitado" if self._es_invitado else "estudiante")
 
-        carnet = estudiante["carnet"] if estudiante else None
-        if carnet:
-            log.info("Sesión iniciada — carnet %s", carnet)
-        else:
-            log.info("Sesión iniciada — invitado (%s)", etiqueta_sector or "sin sector")
-        guardar_sesion({
-            "id": self._sesion_activa_id,
-            "pc_id": PC_ID,
-            "carnet": carnet,
-            "hora_inicio": ahora.isoformat(),
-            "hora_fin": None,
-            "fecha": date.today().isoformat(),
-        })
-        estado_mod.set_sesion_activa(
-            carnet=carnet,
-            nombre=estudiante.get("nombre", "") if estudiante else etiqueta_sector,
-            hora_inicio=ahora.isoformat(),
-            carrera=estudiante.get("carrera") if estudiante else None,
-            facultad=estudiante.get("facultad") if estudiante else None,
-            sexo=estudiante.get("sexo") if estudiante else None,
-            fecha_nacimiento=estudiante.get("fecha_nacimiento") if estudiante else None,
-        )
-
-        self._estudiante_mostrado = estudiante or {
+        self._estudiante_mostrado = sesion["estudiante"] or {
             "nombre": etiqueta_sector, "carrera": "Acceso sin registro", "carnet": None,
         }
         self.bienvenida.iniciar_sesion(self._estudiante_mostrado, ahora)
@@ -196,7 +179,7 @@ class VentanaKiosko(QMainWindow):
         # Mostrar bienvenida 3 segundos y ocultar
         QTimer.singleShot(3000, self._ocultar_a_tray)
 
-        self._timer_sesion.start(DURACION_SESION_MS)
+        self._timer_sesion.start(self._duracion_sesion_ms)
 
     def _on_login_no_estudiante(self, sector: str):
         self._on_login(None, etiqueta_sector=sector)
@@ -215,21 +198,11 @@ class VentanaKiosko(QMainWindow):
             self.showFullScreen()
 
     def _on_actualizacion_exitosa(self, datos: dict):
+        # El servicio ya actualizó el estado de la sesión activa y forzó el
+        # sync al guardar los datos; acá solo se refresca lo que se muestra.
         self._estudiante_activo = datos
         self._estudiante_mostrado = datos
         self.ventana_sesion.actualizar_estudiante(datos)
-        if self._sesion_activa_id:
-            estado_mod.set_sesion_activa(
-                carnet=datos["carnet"],
-                nombre=datos.get("nombre", ""),
-                hora_inicio=self._sesion_inicio.isoformat() if self._sesion_inicio else "",
-                carrera=datos.get("carrera"),
-                facultad=datos.get("facultad"),
-                sexo=datos.get("sexo"),
-                fecha_nacimiento=datos.get("fecha_nacimiento"),
-            )
-            from sync import forzar_sync
-            forzar_sync()
         self.hide()
         self.tray.showMessage(
             "Biblioteca",
@@ -244,14 +217,10 @@ class VentanaKiosko(QMainWindow):
         if not self._sesion_activa_id:
             return
         ahora = now_sv()
-        log.info(
-            "Tiempo de sesión reiniciado a %d min — carnet %s",
-            DURACION_SESION_MS // 60000,
-            self._estudiante_activo["carnet"] if self._estudiante_activo else "invitado",
-        )
-        self._timer_sesion.start(DURACION_SESION_MS)
+        log.info("Tiempo de sesión reiniciado a %d min", self._duracion_sesion_ms // 60000)
+        self._timer_sesion.start(self._duracion_sesion_ms)
         self.ventana_sesion.iniciar_sesion(
-            self._estudiante_mostrado, ahora, DURACION_SESION_MS, self._es_invitado
+            self._estudiante_mostrado, ahora, self._duracion_sesion_ms, self._es_invitado
         )
         self.tray.showMessage(
             "Biblioteca",
@@ -260,32 +229,32 @@ class VentanaKiosko(QMainWindow):
             3000,
         )
 
-    def _on_cerrar_sesion(self):
+    def _cerrar_sesion_en_servicio(self):
+        """Pide al servicio registrar la hora de fin de la sesión activa (y
+        sincronizarla). Si el servicio no responde, la UI vuelve igual al
+        login: la sesión queda abierta en el servicio hasta que se abra la
+        siguiente o se detenga el servicio, y ahí se cierra."""
         self._timer_sesion.stop()
         if self._sesion_activa_id:
-            actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
-            self._sesion_activa_id = None
-            self._sesion_inicio = None
+            try:
+                servicio.llamar("cerrar_sesion")
+            except (servicio.ServicioNoDisponible, servicio.ErrorServicio) as exc:
+                log.error("No se pudo cerrar la sesión en el servicio: %s", exc)
+        self._sesion_activa_id = None
+        self._sesion_inicio = None
         self._estudiante_activo = None
         self._estudiante_mostrado = None
         self._es_invitado = False
-        estado_mod.set_sesion_inactiva()
-        forzar_sync()
+
+    def _on_cerrar_sesion(self):
+        self._cerrar_sesion_en_servicio()
 
         self.ventana_sesion.detener()
         self.bienvenida.detener()
         self._mostrar_login()
 
     def _sesion_expirada(self):
-        if self._sesion_activa_id:
-            actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
-        self._sesion_activa_id = None
-        self._sesion_inicio = None
-        self._estudiante_activo = None
-        self._estudiante_mostrado = None
-        self._es_invitado = False
-        estado_mod.set_sesion_inactiva()
-        forzar_sync()
+        self._cerrar_sesion_en_servicio()
 
         self.ventana_sesion.detener()
         self.bienvenida.detener()
@@ -301,9 +270,7 @@ class VentanaKiosko(QMainWindow):
         if not self._verificar_pin_admin():
             return
         log.info("Kiosko cerrado vía Salir (admin)")
-        if self._sesion_activa_id:
-            actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
-        self._timer_sesion.stop()
+        self._cerrar_sesion_en_servicio()
         self.tray.hide()
         QApplication.quit()
 
@@ -332,69 +299,55 @@ class VentanaKiosko(QMainWindow):
     def _preparar_apagado_o_reinicio(self):
         """Cierra la sesión activa (si la hay) y detiene el timer antes de
         entregarle el control al sistema operativo."""
-        if self._sesion_activa_id:
-            actualizar_hora_fin(self._sesion_activa_id, now_sv().isoformat())
-        self._timer_sesion.stop()
+        self._cerrar_sesion_en_servicio()
         self.tray.hide()
 
     def _verificar_pin_admin(self) -> bool:
-        restante = self._pin_admin_bloqueado_hasta - time.time()
-        if restante > 0:
-            minutos = int(restante // 60) + 1
-            log.warning("Salida admin bloqueada: PIN bloqueado por %d intentos fallidos (%d min restantes)",
-                        self._pin_admin_fallos, minutos)
+        """El hash del PIN y el contador de intentos fallidos los guarda el
+        servicio; la UI solo pide el PIN y muestra el resultado. Si el
+        servicio no responde, la salida queda bloqueada (falla cerrado)."""
+        try:
+            estado = servicio.llamar("estado_pin_admin")
+            if estado["estado"] == "disponible":
+                pin, ok = QInputDialog.getText(
+                    self, "Salida de administrador", "PIN de administrador:",
+                    QLineEdit.EchoMode.Password
+                )
+                if not ok:
+                    return False
+                estado = servicio.llamar("verificar_pin_admin", pin=pin)
+        except (servicio.ServicioNoDisponible, servicio.ErrorServicio) as exc:
+            log.error("No se pudo verificar el PIN de administrador: %s", exc)
             QMessageBox.warning(
-                self, "PIN bloqueado",
-                f"Demasiados intentos fallidos. Esperá {minutos} minuto(s) antes de volver a intentar."
+                self, "Sistema no disponible",
+                "No se pudo verificar el PIN porque el servicio del kiosko no responde."
             )
             return False
-        if not ADMIN_PIN_HASH:
-            log.warning("Salida admin bloqueada: sin PIN configurado")
+
+        resultado = estado["estado"]
+        if resultado == "ok":
+            log.info("Salida admin autorizada (PIN correcto)")
+            return True
+        log.warning("Salida admin denegada: %s", resultado)
+        if resultado == "bloqueado":
+            QMessageBox.warning(
+                self, "PIN bloqueado",
+                f"Demasiados intentos fallidos. Esperá {estado['minutos']} minuto(s) antes de volver a intentar."
+            )
+        elif resultado == "sin_pin":
             QMessageBox.warning(
                 self, "Salida bloqueada",
                 "No hay un PIN de administrador configurado en config.ini "
                 "([admin] pin_hash). Configúralo antes de poder salir del kiosko."
             )
-            return False
-        if es_hash_legacy(ADMIN_PIN_HASH):
-            # Hash del formato viejo (SHA-256 plano sin sal) — no se puede
-            # migrar en caliente sin conocer el PIN en texto plano, así que
-            # se bloquea y se pide reconfigurar.
-            log.warning("Salida admin bloqueada: pin_hash en formato legacy, requiere reconfigurar")
+        elif resultado == "legacy":
             QMessageBox.warning(
                 self, "Reconfiguración requerida",
                 "El PIN de administrador quedó guardado en un formato antiguo "
                 "e inseguro. Volvé a ejecutar setup.py para configurar un PIN "
                 "nuevo antes de poder salir del kiosko."
             )
-            return False
-        pin, ok = QInputDialog.getText(
-            self, "Salida de administrador", "PIN de administrador:",
-            QLineEdit.EchoMode.Password
-        )
-        if not ok:
-            return False
-        if verificar_pin(pin, ADMIN_PIN_HASH):
-            log.info("Salida admin autorizada (PIN correcto)")
-            self._pin_admin_fallos = 0
-            self._pin_admin_bloqueado_hasta = 0.0
-            guardar_estado_pin(PC_ID, self._pin_admin_fallos, self._pin_admin_bloqueado_hasta)
-            return True
-        self._pin_admin_fallos += 1
-        log.warning("Salida admin denegada: PIN incorrecto (intento %d/%d)",
-                    self._pin_admin_fallos, PIN_ADMIN_MAX_INTENTOS)
-        if self._pin_admin_fallos >= PIN_ADMIN_MAX_INTENTOS:
-            self._pin_admin_bloqueado_hasta = time.time() + PIN_ADMIN_BLOQUEO_SEGUNDOS
-            log.warning("PIN de administrador bloqueado por %d minutos tras exceder intentos",
-                        PIN_ADMIN_BLOQUEO_SEGUNDOS // 60)
-            guardar_estado_pin(PC_ID, self._pin_admin_fallos, self._pin_admin_bloqueado_hasta)
-            QMessageBox.warning(
-                self, "PIN bloqueado",
-                f"Demasiados intentos fallidos. El PIN quedó bloqueado por "
-                f"{PIN_ADMIN_BLOQUEO_SEGUNDOS // 60} minutos."
-            )
         else:
-            guardar_estado_pin(PC_ID, self._pin_admin_fallos, self._pin_admin_bloqueado_hasta)
             QMessageBox.warning(self, "PIN incorrecto", "El PIN ingresado no es válido.")
         return False
 

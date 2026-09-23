@@ -1,31 +1,29 @@
+"""Configuración del servicio del kiosko (servicio/). Lee config.ini, que
+contiene la API key de la PC y el hash del PIN de administrador, así que
+solo debe importarlo el proceso del servicio: la UI corre como otro usuario
+del sistema y no tiene permiso de lectura sobre DATA_DIR (ver core/rutas.py).
+La UI toma la hora de core/tiempo.py y lo demás se lo pide al servicio."""
 import configparser
 import os
 import uuid
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
-from zoneinfo import ZoneInfo
 
-TZ_SV = ZoneInfo("America/El_Salvador")
+from core.rutas import DATA_DIR
+from core.tiempo import TZ_SV, now_sv  # noqa: F401 (re-exportados para el servicio)
 
-
-def now_sv() -> datetime:
-    return datetime.now(TZ_SV)
-
-BASE_DIR = Path(__file__).parent.parent
-CONFIG_FILE = BASE_DIR / "config.ini"
-PC_ID_FILE = BASE_DIR / ".pc_id"
+CONFIG_FILE = DATA_DIR / "config.ini"
+PC_ID_FILE = DATA_DIR / ".pc_id"
 
 _config = configparser.ConfigParser()
 _config.read(CONFIG_FILE, encoding="utf-8")
 
 # Best-effort: protege KIOSK_API_KEY/pin_hash contra otras cuentas del
 # sistema si config.ini ya existía de una instalación anterior a este
-# chmod (setup.py solo corre una vez, esto corre en cada arranque). No
-# cierra el vector principal (alguien escapando la sesión del kiosko) —
-# para eso hace falta el bloqueo de escritorio a nivel de sistema (ver
-# docs/desarrollo/despliegue.md, sección "Bloqueo de escritorio para
-# producción"), no permisos de archivo.
+# chmod (setup.py solo corre una vez, esto corre en cada arranque). Solo
+# sirve si el estudiante usa una cuenta distinta de la del servicio: el
+# dueño del archivo siempre puede leerlo, por eso la UI corre con otro
+# usuario y habla con el servicio por un socket local (ver servicio/).
 if CONFIG_FILE.exists():
     try:
         os.chmod(CONFIG_FILE, 0o600)
@@ -88,7 +86,7 @@ ADMIN_PIN_HASH: str = _get("admin", "pin_hash", "BIBLIOTECA_ADMIN_PIN_HASH", "")
 # Certificado de la CA interna (PEM) que firmó el certificado del servidor,
 # para validar la conexión HTTPS cuando el servidor no tiene un certificado
 # de una CA pública (caso normal en la LAN del laboratorio, sin dominio
-# público — ver servidor/scripts/generar_ca.sh). Relativo a cliente/ si no
+# público — ver servidor/scripts/generar_ca.sh). Relativo a DATA_DIR si no
 # es una ruta absoluta. Si queda vacío, se usa el almacén de CAs del sistema
 # operativo (correcto si el servidor sí tiene un certificado público real).
 _CA_CERT_RAW: str = _get("servidor", "ca_cert", "BIBLIOTECA_CA_CERT", "")
@@ -96,7 +94,7 @@ CA_CERT_PATH: str = ""
 if _CA_CERT_RAW:
     _ca_path = Path(_CA_CERT_RAW)
     if not _ca_path.is_absolute():
-        _ca_path = BASE_DIR / _ca_path
+        _ca_path = DATA_DIR / _ca_path
     if not _ca_path.exists():
         raise RuntimeError(
             f"[servidor] ca_cert ({_CA_CERT_RAW}) está configurado pero el archivo "
@@ -123,3 +121,10 @@ HARDWARE_INTERVAL_SEGUNDOS: int = int(_get("hardware", "intervalo_segundos", def
 BLOQUEAR_ATAJOS_ESCRITORIO: bool = _get(
     "escritorio", "bloquear_atajos", "BIBLIOTECA_BLOQUEAR_ATAJOS", "true"
 ).strip().lower() not in ("0", "false", "no")
+
+# Grupo del sistema cuyos miembros (el usuario de la sesión gráfica del
+# kiosko) pueden conectarse al socket del servicio, además del propio
+# usuario del servicio. Si el grupo no existe (desarrollo con un único
+# usuario), solo se aceptan conexiones del mismo usuario que corre el
+# servicio. Ver servicio/servidor.py.
+GRUPO_UI: str = _get("servicio", "grupo_ui", "BIBLIOTECA_GRUPO_UI", "kiosko-ui")

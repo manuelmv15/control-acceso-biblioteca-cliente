@@ -43,13 +43,15 @@ Luego `setup.py`:
 - Inicializa la base de datos SQLite local.
 - Ofrece instalar el autostart (ver siguiente sección).
 
+El kiosko son dos procesos: el servicio (`python -m servicio`), que lee `config.ini` y la base local y habla con el servidor, y la interfaz (`python main.py`), que solo le habla al servicio por un socket local. Tienen que correr con usuarios del sistema distintos para que el estudiante no pueda leer `config.ini` ni la base; ver [`estructura.md`](./estructura.md), sección **Separación entre la UI y el servicio**. `config.ini`, `.pc_id`, `db_key.bin`, la base y los logs del servicio van en `BIBLIOTECA_DATA_DIR` (por defecto, junto al código).
+
 ## Binario empaquetado (PyInstaller, CI)
 
 `.github/workflows/pip-audit.yml` (job `build-cliente`) empaqueta `main.py` con PyInstaller (`cliente/build.spec`) en cada push/PR y sube el resultado como artifact (`biblioteca-kiosko-linux`, 30 días de retención) — sirve como verificación automática de que el kiosko sigue empaquetando y arrancando (smoke test headless), y como forma de bajar un build ya armado sin instalar Python en la PC destino.
 
 **Sigue siendo `onedir`, no `onefile`**: el resultado es una carpeta (`biblioteca-kiosko/` con el ejecutable y `_internal/` al lado), no un solo archivo. Es a propósito — `config.ini`, `.pc_id` y la base SQLite local se guardan junto al código (`_internal/`), y en un bundle `onefile` esa carpeta se recrearía vacía en un directorio temporal distinto cada vez que se abre la app, perdiendo la identidad de la PC y el caché local en cada reinicio. Para usarlo hay que copiar la carpeta `biblioteca-kiosko/` completa, no solo el ejecutable.
 
-**Limitación actual: `setup.py` no está empaquetado**, solo `main.py`. El binario no tiene el asistente de primera configuración — antes de usarlo en una PC hace falta generar su `config.ini`/`.pc_id` (con `python setup.py` desde un checkout del código, ver más abajo) y copiar esos dos archivos dentro de `_internal/` de la carpeta empaquetada. Como cada PC necesita su propio `.pc_id`/API key (ver siguiente sección), **no se puede copiar la misma carpeta ya configurada a las 16 PCs** — cada una necesita su propio `setup.py` + su propia copia de `_internal/config.ini`/`_internal/.pc_id`, o (más simple hoy) seguir instalando desde código fuente como abajo. Este binario es, por ahora, sobre todo una verificación de CI, no todavía el método de despliegue recomendado.
+**Limitación actual: `setup.py` no está empaquetado**, solo `main.py`. El binario no tiene el asistente de primera configuración — antes de usarlo en una PC hace falta generar su `config.ini`/`.pc_id` (con `python setup.py` desde un checkout del código, ver más abajo) y copiar esos dos archivos dentro de `_internal/` de la carpeta empaquetada. Como cada PC necesita su propio `.pc_id`/API key (ver siguiente sección), **no se puede copiar la misma carpeta ya configurada a las 16 PCs** — cada una necesita su propio `setup.py` + su propia copia de `_internal/config.ini`/`_internal/.pc_id`, o (más simple hoy) seguir instalando desde código fuente como abajo. Este binario es, por ahora, sobre todo una verificación de CI, no todavía el método de despliegue recomendado. Además, solo empaqueta la interfaz: el servicio (`python -m servicio`) no está incluido en el binario.
 
 ## Autostart en Linux (`cliente/autostart/`)
 
@@ -59,6 +61,8 @@ Luego `setup.py`:
 cd cliente/autostart
 ./instalar_linux.sh
 ```
+
+> ⚠️ **Pendiente:** estos scripts todavía instalan un solo proceso (`main.py`) con el usuario de la sesión gráfica. Hay que adaptarlos a la separación entre UI y servicio: un usuario de servicio dueño de `BIBLIOTECA_DATA_DIR`, el servicio como unidad systemd con ese usuario y la UI en el autostart de la sesión del estudiante. Hasta entonces, el servicio se arranca a mano con `python -m servicio`.
 
 Crea un `.desktop` en `~/.config/autostart/` para arrancar la app al iniciar sesión gráfica. Opcionalmente, con confirmación, instala también un servicio `systemd` (`biblioteca-kiosko.service`, `Restart=always`, con `DISPLAY`/`XAUTHORITY` configurados para acceso gráfico) habilitado con `systemctl enable` — recomendado para que el kiosko se recupere solo ante un cierre inesperado.
 
@@ -99,6 +103,9 @@ Mata cualquier proceso en ejecución de la app, elimina el `.desktop` de autosta
 | `DURACION_SESION_MINUTOS` | `[sesion] duracion_minutos` | — | 60 |
 | `HARDWARE_INTERVAL_SEGUNDOS` | `[hardware] intervalo_segundos` | — | 300 |
 | `BLOQUEAR_ATAJOS_ESCRITORIO` | `[escritorio] bloquear_atajos` | `BIBLIOTECA_BLOQUEAR_ATAJOS` | `true` |
+| `GRUPO_UI` | `[servicio] grupo_ui` | `BIBLIOTECA_GRUPO_UI` | `kiosko-ui` (grupo del sistema cuyos miembros pueden usar el socket del servicio; si no existe, solo el propio usuario del servicio) |
+
+Fuera de `config.ini`: `BIBLIOTECA_DATA_DIR` (directorio de datos del servicio), `BIBLIOTECA_SOCKET` (ruta del socket, la misma para el servicio y la UI) y `BIBLIOTECA_UI_LOG` (archivo de log opcional de la UI). Ver `estructura.md`.
 
 ## TLS (cifrado entre el kiosko y el servidor)
 

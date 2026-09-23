@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from core.config import now_sv
+from core.tiempo import now_sv
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,

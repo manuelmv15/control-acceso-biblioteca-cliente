@@ -34,7 +34,7 @@ def obtener_pendientes() -> list:
 def marcar_sincronizado(ids: list):
     if not ids:
         return
-    from core.config import now_sv
+    from core.tiempo import now_sv
     ahora = now_sv().isoformat()
     conn = get_connection()
     placeholders = ",".join("?" * len(ids))

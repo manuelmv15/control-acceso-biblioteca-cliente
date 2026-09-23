@@ -1,14 +1,14 @@
 import logging
 import os
 import threading
-from pathlib import Path
 
 from core.config import HARDWARE_INTERVAL_SEGUNDOS, PC_ID, now_sv
+from core.rutas import DATA_DIR
 from network.hardware import enviar_hardware
 
 from hardware import collector, mantenimiento
 
-LOG_FILE = Path(__file__).parent.parent / "hardware.log"
+LOG_FILE = DATA_DIR / "hardware.log"
 log = logging.getLogger("hardware-agent")
 log.setLevel(logging.INFO)
 log.propagate = False

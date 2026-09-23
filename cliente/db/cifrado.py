@@ -23,11 +23,11 @@ plano produce cifrados distintos cada vez), así que cifrarlo rompería esas
 búsquedas.
 """
 import os
-from pathlib import Path
 
+from core.rutas import DATA_DIR
 from cryptography.fernet import Fernet, InvalidToken
 
-_KEY_PATH = Path(__file__).parent.parent / "db_key.bin"
+_KEY_PATH = DATA_DIR / "db_key.bin"
 
 CAMPOS_CIFRADOS = ("nombre", "carrera", "facultad", "fecha_nacimiento", "sexo")
 

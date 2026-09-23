@@ -15,6 +15,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ui import servicio
+from ui.log import log
+
 SEDE_SAN_MIGUEL = "San Miguel"
 SEDE_MORAZAN = "San Francisco Gotera (Morazán)"
 SEDE_LA_UNION = "La Unión"
@@ -302,13 +305,6 @@ class PantallaRegistro(QWidget):
             self._limpiar()
             return
 
-        import uuid
-        from datetime import date
-
-        from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache
-        from network.client import hay_conexion
-        from network.estudiantes import obtener_estudiante, registrar_estudiante
-
         nombre = self.nombre.text().strip()
         carnet = normalizar_carnet(self.carnet.text())
 
@@ -349,40 +345,39 @@ class PantallaRegistro(QWidget):
             self.lbl_error.setText("Seleccione una carrera válida de la lista para la sede/departamento elegido.")
             return
 
-        if not self._modo_actualizacion:
-            existe = buscar_estudiante_cache(carnet)
-            if not existe and hay_conexion():
-                existe = obtener_estudiante(carnet)
-            if existe:
-                self.lbl_error.setText("Este carnet ya está registrado. Inicie sesión con su carnet.")
-                return
-
         datos = {
-            "id": str(uuid.uuid4()),
             "nombre": nombre,
             "carnet": carnet,
             "fecha_nacimiento": anio_nac,
             "carrera": carrera,
             "facultad": facultad_valor,
             "sexo": self.genero.currentData(),
-            "fecha_registro": date.today().isoformat(),
         }
 
-        modo_pendiente = "actualizar" if self._modo_actualizacion else "crear"
+        # El servicio comprueba si el carnet ya existe, lo envía al servidor
+        # y, si no hay red o el servidor falla, lo deja pendiente en la caché
+        # local para reintentarlo en el siguiente ciclo de sync.
+        modo_servicio = "actualizar" if self._modo_actualizacion else "crear"
+        try:
+            resultado = servicio.llamar("guardar_estudiante", modo=modo_servicio, datos=datos)
+        except servicio.ErrorServicio as exc:
+            if exc.codigo == "carnet_duplicado":
+                self.lbl_error.setText("Este carnet ya está registrado. Inicie sesión con su carnet.")
+            elif exc.codigo == "sin_permiso":
+                self.lbl_error.setText("Solo puede actualizar sus datos durante su propia sesión.")
+            else:
+                log.error("Registro rechazado por el servicio: %s", exc)
+                self.lbl_error.setText("Datos inválidos. Revise el formulario.")
+            return
+        except servicio.ServicioNoDisponible as exc:
+            log.error("No se pudo registrar: %s", exc)
+            self.lbl_error.setText("El sistema no está disponible. Intente de nuevo en unos segundos.")
+            return
 
-        if hay_conexion():
-            if self._modo_actualizacion:
-                from network.estudiantes import actualizar_estudiante
-                ok = actualizar_estudiante(carnet, datos)
-            else:
-                ok = registrar_estudiante(datos)
-            if ok:
-                guardar_estudiante_cache({**datos, "nombre": nombre})
-            else:
-                guardar_estudiante_cache({**datos, "nombre": nombre}, sincronizado=0, pendiente_modo=modo_pendiente)
-                self.lbl_error.setText("Error al enviar al servidor — guardado localmente, se reintentará")
-        else:
-            guardar_estudiante_cache({**datos, "nombre": nombre}, sincronizado=0, pendiente_modo=modo_pendiente)
+        datos = resultado["estudiante"]
+        if resultado["estado"] == "pendiente_error":
+            self.lbl_error.setText("Error al enviar al servidor — guardado localmente, se reintentará")
+        elif resultado["estado"] == "pendiente_sin_conexion":
             self.lbl_error.setText("Sin internet — guardado localmente, se sincronizará después")
 
         modo = self._modo_actualizacion

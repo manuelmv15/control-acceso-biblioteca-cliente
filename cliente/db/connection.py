@@ -1,8 +1,9 @@
 import os
 import sqlite3
-from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "biblioteca_local.db"
+from core.rutas import DATA_DIR
+
+DB_PATH = DATA_DIR / "biblioteca_local.db"
 
 
 def _restringir_permisos():

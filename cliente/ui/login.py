@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ui import servicio
 from ui.log import log
 
 
@@ -116,10 +117,6 @@ class PantallaLogin(QWidget):
         self.carnet_input.setCursorPosition(pos)
 
     def _intentar_login(self):
-        from db.estudiantes import buscar_estudiante_cache, guardar_estudiante_cache
-        from network.client import hay_conexion
-        from network.estudiantes import obtener_estudiante
-
         carnet = normalizar_carnet(self.carnet_input.text())
         if not carnet:
             self.lbl_error.setText("Ingrese su carnet")
@@ -130,27 +127,18 @@ class PantallaLogin(QWidget):
 
         self.lbl_error.setText("Buscando...")
 
-        est = buscar_estudiante_cache(carnet)
-        if not est and hay_conexion():
-            datos = obtener_estudiante(carnet)
-            if datos:
-                est = datos
-                guardar_estudiante_cache({
-                    "carnet": datos.get("carnet", carnet),
-                    "nombre": datos.get("nombre", ""),
-                    "carrera": datos.get("carrera", ""),
-                    "facultad": datos.get("facultad", ""),
-                    "fecha_nacimiento": datos.get("fecha_nacimiento", ""),
-                    "sexo": datos.get("sexo", ""),
-                })
+        try:
+            est = servicio.llamar("buscar_estudiante", carnet=carnet)
+        except (servicio.ServicioNoDisponible, servicio.ErrorServicio) as exc:
+            log.error("No se pudo buscar el carnet: %s", exc)
+            self.lbl_error.setText("El sistema no está disponible. Intente de nuevo en unos segundos.")
+            return
 
         if est:
-            log.info("Login OK — carnet %s", carnet)
             self.lbl_error.setText("")
             self.carnet_input.clear()
             self.login_exitoso.emit(est)
         else:
-            log.info("Login fallido — carnet %s no encontrado", carnet)
             self.lbl_error.setText("Carnet no encontrado. ¿Es su primera vez? Regístrese.")
 
     def limpiar(self):

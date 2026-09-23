@@ -16,7 +16,8 @@ Documentación de desarrollo, parte 2 de 2. Para cómo desplegar, ver [`desplieg
 - **DB local**: SQLite puro (sin ORM), `PRAGMA journal_mode=WAL`, `sqlite3.Row` como row factory (`db/connection.py`).
 - **Red**: `requests`, HTTP síncrono contra la URL del servidor configurada.
 - **Hardware**: `psutil` (opcional, con fallback si no está instalado) + `smartctl` vía `subprocess` para el estado SMART del disco.
-- **Concurrencia**: dos hilos daemon independientes — sincronización general (`sync/`) y telemetría de hardware (`hardware/agent.py`) — cada uno despertable bajo demanda vía `threading.Event`.
+- **Procesos**: la UI y un servicio en segundo plano separados, comunicados por un socket UNIX local — ver **Separación entre la UI y el servicio**.
+- **Concurrencia** (dentro del servicio): dos hilos daemon independientes — sincronización general (`sync/`) y telemetría de hardware (`hardware/agent.py`) — cada uno despertable bajo demanda vía `threading.Event`.
 
 Dependencias (`cliente/requirements.txt`): `PyQt6`, `requests`, `psutil`.
 
@@ -24,10 +25,13 @@ Dependencias (`cliente/requirements.txt`): `PyQt6`, `requests`, `psutil`.
 
 ```
 cliente/
-├── main.py                # entry point: init_db() → iniciar_sync() → iniciar_hardware_agent() → UI
+├── main.py                # entry point de la UI (sin acceso a config.ini ni a la base local)
 ├── setup.py                # configuración inicial por PC (una sola vez): config.ini + .pc_id
 ├── core/
-│   ├── config.py            # carga de config.ini + overrides por variable de entorno
+│   ├── config.py            # carga de config.ini + overrides por variable de entorno (solo el servicio)
+│   ├── rutas.py              # BASE_DIR (código) y DATA_DIR (datos: config.ini, base local, clave, logs)
+│   ├── ipc.py                # protocolo UI ↔ servicio y ruta del socket
+│   ├── tiempo.py             # zona horaria y now_sv()
 │   ├── estado.py             # estado en memoria de la sesión activa
 │   └── bloqueo_escritorio.py  # deshabilita atajos de GNOME (best-effort)
 ├── db/                      # acceso a SQLite local
@@ -37,20 +41,57 @@ cliente/
 │   ├── mantenimiento.py         # acumulación de horas de uso y estado de mantenimiento
 │   └── agent.py                  # hilo daemon que orquesta ambos y reporta al servidor
 ├── network/                 # cliente HTTP delgado por dominio (estudiantes, hardware, sesiones)
+├── servicio/                 # proceso en segundo plano: `python -m servicio`
+│   ├── __main__.py            # arranque: init_db() → socket → sync → hardware
+│   ├── operaciones.py         # lo que la UI puede pedir, con su validación
+│   └── servidor.py            # socket UNIX: control de acceso y despacho
 ├── sync/__init__.py          # hilo daemon de sincronización general (sesiones + estudiantes + heartbeat)
 ├── ui/                       # pantallas: kiosko, login, registro, bienvenida, flotante
+│   └── servicio.py            # cliente del socket del servicio
 └── autostart/                # scripts de instalación/desinstalación/actualización en Linux
 ```
 
 ## Flujo de uso completo
 
-1. **Arranque** (`main.py`): inicializa la DB local, lanza el hilo de sync, lanza el hilo del agente de hardware, y crea la `VentanaKiosko`.
+1. **Arranque**: el servicio (`python -m servicio`) inicializa la DB local, abre el socket y lanza los hilos de sync y del agente de hardware. La UI (`main.py`) le pregunta al servicio si debe bloquear los atajos de escritorio y crea la `VentanaKiosko`.
 2. **`VentanaKiosko`** (`ui/kiosko.py`): pantalla completa, sin bordes, siempre encima (`FramelessWindowHint | WindowStaysOnTopHint`). Contiene un `QStackedWidget` con login, registro y bienvenida/sesión, más un ícono de bandeja del sistema (menú: "Cerrar sesión" / "Salir (admin)") y un atajo oculto **`Ctrl+Shift+Alt+Q`** para salida administrativa.
-3. **Login** (`ui/login.py`): el usuario escribe su carnet. Se busca primero en la caché local (`estudiantes_cache`); si no está y hay conexión, se consulta al servidor (`GET /estudiantes/{carnet}`) y se cachea el resultado. Si no existe, invita a registrarse.
-4. **Registro** (`ui/registro.py`): formulario con nombre, carnet, año de nacimiento, sector (Estudiante/Administrativo/Docente/Visitante), sede, facultad/departamento y carrera (listas en cascada), y género. Si el sector no es "Estudiante", no se piden datos personales y se otorga acceso anónimo (modo invitado, sesión sin carnet). Si hay datos de estudiante, se valida duplicado e intenta enviarse al servidor (`POST`/`PUT /estudiantes`); si falla o no hay red, se guarda localmente marcado como pendiente de sincronizar.
-5. **Sesión iniciada**: se genera un `uuid4` como id de sesión, se guarda en `sesiones_pendientes` local, se muestra una pantalla de bienvenida (`ui/bienvenida.py`, ~3s) y luego la ventana se oculta a la bandeja mostrando un **widget flotante** (`ui/flotante.py`) — botón circular expandible con el tiempo restante, botón de "Actualizar mis datos" (oculto para invitados) y "Cerrar sesión". Arranca un temporizador de duración de sesión configurable.
-6. **Cierre de sesión**: manual o por expiración automática. En ambos casos se registra `hora_fin`, se limpia el estado en memoria, se fuerza una sincronización inmediata (sin esperar el intervalo periódico), y se vuelve a mostrar el login en pantalla completa.
-7. **Salida administrativa**: solo posible con el atajo secreto o el ítem "Salir (admin)" del menú de bandeja, y ambos exigen ingresar el PIN de administrador (hash SHA-256 comparado con `hmac.compare_digest` contra `[admin] pin_hash` en `config.ini`) antes de cerrar cualquier sesión activa y terminar la aplicación. Si no hay PIN configurado, la salida queda bloqueada (falla cerrado, no hay bypass por defecto). El botón de cerrar normal del sistema operativo está interceptado: solo oculta la ventana a la bandeja, nunca cierra la app.
+3. **Login** (`ui/login.py`): el usuario escribe su carnet y la UI se lo pasa al servicio (`buscar_estudiante`). El servicio lo busca primero en la caché local (`estudiantes_cache`); si no está y hay conexión, se consulta al servidor (`GET /estudiantes/{carnet}`) y se cachea el resultado. Si no existe, invita a registrarse.
+4. **Registro** (`ui/registro.py`): formulario con nombre, carnet, año de nacimiento, sector (Estudiante/Administrativo/Docente/Visitante), sede, facultad/departamento y carrera (listas en cascada), y género. Si el sector no es "Estudiante", no se piden datos personales y se otorga acceso anónimo (modo invitado, sesión sin carnet). Si hay datos de estudiante, la UI se los pasa al servicio (`guardar_estudiante`), que valida duplicado e intenta enviarlos al servidor (`POST`/`PUT /estudiantes`); si falla o no hay red, se guarda localmente marcado como pendiente de sincronizar.
+5. **Sesión iniciada**: el servicio (`abrir_sesion`) genera un `uuid4` como id de sesión, lo guarda en `sesiones_pendientes` local y fija la duración; la UI se muestra una pantalla de bienvenida (`ui/bienvenida.py`, ~3s) y luego la ventana se oculta a la bandeja mostrando un **widget flotante** (`ui/flotante.py`) — botón circular expandible con el tiempo restante, botón de "Actualizar mis datos" (oculto para invitados) y "Cerrar sesión". Arranca un temporizador de duración de sesión configurable.
+6. **Cierre de sesión**: manual o por expiración automática. En ambos casos la UI llama a `cerrar_sesion` y el servicio registra `hora_fin`, se limpia el estado en memoria, se fuerza una sincronización inmediata (sin esperar el intervalo periódico), y se vuelve a mostrar el login en pantalla completa.
+7. **Salida administrativa**: solo posible con el atajo secreto o el ítem "Salir (admin)" del menú de bandeja, y ambos exigen ingresar el PIN de administrador, que verifica el servicio (hash PBKDF2 en `[admin] pin_hash` de `config.ini`, con bloqueo tras 5 intentos fallidos) antes de cerrar cualquier sesión activa y terminar la aplicación. Si no hay PIN configurado, la salida queda bloqueada (falla cerrado, no hay bypass por defecto). El botón de cerrar normal del sistema operativo está interceptado: solo oculta la ventana a la bandeja, nunca cierra la app.
+
+## Separación entre la UI y el servicio
+
+El kiosko son **dos procesos**, pensados para correr con **usuarios del sistema distintos**:
+
+- **Servicio** (`python -m servicio`, paquete `servicio/`): el único que lee `config.ini` (API key de la PC, hash del PIN de administrador), la clave de cifrado `db_key.bin` y la base local, y el único que habla con el servidor. Corre los hilos de sync y de hardware y atiende a la UI por un socket UNIX local.
+- **UI** (`python main.py`): la interfaz PyQt. Corre con el usuario de la sesión gráfica, que es el mismo que usa el estudiante cuando el kiosko se oculta en la bandeja. No lee ningún archivo de datos: le pide al servicio operaciones concretas (`ui/servicio.py` → `core/ipc.py`).
+
+Así el estudiante no puede leer la API key, descifrar la caché ni leer la base aunque salga del kiosko (navegador con `file://`, un gestor de archivos...): esos archivos pertenecen a otro usuario. Separar los procesos solo protege si además los usuarios son distintos y los datos viven fuera del alcance del usuario de la sesión (`BIBLIOTECA_DATA_DIR` con permisos `700`).
+
+**Protocolo** (`core/ipc.py`): una petición JSON por conexión (`{"op": ..., "args": {...}}`) y una respuesta JSON, con un límite de 64 KiB por mensaje. Operaciones disponibles (`servicio/servidor.py::OPERACIONES`): `info`, `buscar_estudiante`, `guardar_estudiante`, `abrir_sesion`, `cerrar_sesion`, `estado_pin_admin`, `verificar_pin_admin`. No hay operaciones genéricas para leer la base ni la configuración.
+
+**Controles del servicio sobre lo que pide la UI**, que se trata como entrada no confiable:
+- Solo acepta conexiones del propio usuario del servicio o de miembros del grupo `[servicio] grupo_ui` (por defecto `kiosko-ui`), según las credenciales que da el kernel (`SO_PEERCRED`). El socket se crea con modo `0660`.
+- Valida tipos, longitudes y el formato del carnet de cada argumento.
+- Genera él mismo el id y la hora de inicio de cada sesión y toma los datos del estudiante de su propia caché, no de la UI. Si se abre una sesión con otra ya abierta, cierra la anterior.
+- `guardar_estudiante` en modo `actualizar` solo acepta el carnet con la sesión activa en esta PC.
+- El contador de intentos fallidos del PIN de administrador se aplica en el servicio, así que tampoco se esquiva hablándole directamente al socket.
+- Al recibir `SIGTERM` (apagado, reinicio, `systemctl stop`) cierra la sesión activa con su hora real de fin.
+
+**Ubicación del socket** (`core/ipc.py::ruta_socket`): `BIBLIOTECA_SOCKET` si está definida; si no, `/run/biblioteca/kiosko.sock` cuando existe ese directorio (instalación con systemd) o, en desarrollo, `$XDG_RUNTIME_DIR/biblioteca-kiosko.sock`. La ruta debe tener menos de 108 caracteres (límite de los sockets UNIX).
+
+**Si el servicio no responde**, la UI no se cierra: el login y el registro muestran "El sistema no está disponible", la salida de administrador queda bloqueada (falla cerrado) y los atajos de escritorio se bloquean igual.
+
+**Desarrollo con un solo usuario**, desde `cliente/`, en dos terminales:
+
+```bash
+python -m servicio   # 1) servicio: config.ini, base local, sync, hardware
+python main.py       # 2) interfaz
+```
+
+Con un solo usuario se prueba el funcionamiento, pero no el aislamiento: para eso hacen falta los dos usuarios del sistema.
 
 ## Modelo de datos local (`db/schema.py`)
 
@@ -100,7 +141,7 @@ Loguea todo en `sync.log`. Expone `forzar_sync()`, invocado tras login, logout o
 
 ## Configuración — para detalle de despliegue ver `despliegue.md`
 
-`core/config.py` lee `config.ini` (secciones `[pc]`, `[servidor]`, `[sync]`, `[admin]`, `[escritorio]`) con override por variable de entorno. También define `TZ_SV = ZoneInfo("America/El_Salvador")` y `now_sv()`, usados en toda la app para timestamps consistentes.
+`core/config.py` lee `config.ini` (secciones `[pc]`, `[servidor]`, `[sync]`, `[admin]`, `[escritorio]`, `[servicio]`) con override por variable de entorno, y solo lo importa el servicio. `config.ini` y el resto de los datos están en `DATA_DIR` (`BIBLIOTECA_DATA_DIR`, por defecto junto al código). `TZ_SV = ZoneInfo("America/El_Salvador")` y `now_sv()` están en `core/tiempo.py`, que usan la UI y el servicio.
 
 ## Detalles importantes / peculiaridades
 
@@ -108,7 +149,7 @@ Loguea todo en `sync.log`. Expone `forzar_sync()`, invocado tras login, logout o
 - **`.pc_id`**: archivo de texto plano con un UUID4, generado una sola vez. Es el identificador **estable y persistente** de la PC física usado en todos los payloads hacia el servidor — independiente del hostname/MAC, que solo sirven para inventario legible.
 - **Tolerancia a fallos de red**: cualquier excepción en la capa `network/` se traga y los datos quedan marcados como pendientes en SQLite, reintentándose automáticamente en el siguiente ciclo del daemon de sync, sin intervención del usuario.
 - **Modo invitado**: si el sector elegido no es "Estudiante", no se piden datos personales; la sesión se guarda con `carnet=None`. Requiere la migración `_migrar_carnet_nullable` en bases de datos creadas antes de que existiera este modo.
-- **Logs**: `sync.log` y `hardware.log`, ambos regenerables (no versionados en git), limpiados por `desinstalar_linux.sh`.
+- **Logs**: el servicio escribe `servicio.log`, `sync.log` y `hardware.log` en `DATA_DIR` (regenerables, no versionados en git). La UI solo escribe en stderr, sin carnets, porque su cuenta la comparten todos los estudiantes; `BIBLIOTECA_UI_LOG=<ruta>` activa además un archivo para desarrollo.
 - Los estilos y el catálogo de sedes/facultades/carreras en `ui/registro.py` replican la identidad visual y la oferta académica real de la UES (Facultad Multidisciplinaria de Oriente).
 
 ## Mapa del código (`.codebase-memory/`)

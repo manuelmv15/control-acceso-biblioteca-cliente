@@ -1,10 +1,10 @@
 import logging
 import os
 import threading
-from pathlib import Path
 
 import core.estado as estado_mod
 from core.config import PC_ID, PC_NOMBRE, SERVER_URL, SYNC_INTERVAL
+from core.rutas import DATA_DIR
 from db.estudiantes import (
     buscar_estudiante_cache,
     marcar_estudiante_sincronizado,
@@ -15,7 +15,7 @@ from network.client import hay_conexion
 from network.estudiantes import actualizar_estudiante, registrar_estudiante
 from network.sesiones import enviar_estado, enviar_sesiones
 
-LOG_FILE = Path(__file__).parent.parent / "sync.log"
+LOG_FILE = DATA_DIR / "sync.log"
 log = logging.getLogger("sync")
 log.setLevel(logging.INFO)
 log.propagate = False
