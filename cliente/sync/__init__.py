@@ -4,13 +4,14 @@ import threading
 
 import core.estado as estado_mod
 from core.config import PC_ID, PC_NOMBRE, SERVER_URL, SYNC_INTERVAL
+from core.lotes_sync import enviar_por_lotes
 from core.rutas import DATA_DIR
 from db.estudiantes import (
     buscar_estudiante_cache,
     marcar_estudiante_sincronizado,
     obtener_estudiantes_pendientes,
 )
-from db.sesiones import marcar_sincronizado, obtener_pendientes
+from db.sesiones import marcar_rechazada, marcar_sincronizado, obtener_pendientes
 from network.client import hay_conexion
 from network.estudiantes import actualizar_estudiante, registrar_estudiante
 from network.sesiones import enviar_estado, enviar_sesiones
@@ -73,36 +74,40 @@ def _ejecutar_ciclo():
 
     _sincronizar_estudiantes_pendientes()
 
-    pendientes = obtener_pendientes()
-    if not pendientes:
+    resultado = enviar_por_lotes(
+        obtener_lote=lambda n: [_enriquecer(s) for s in obtener_pendientes(limite=n)],
+        enviar=lambda sesiones: enviar_sesiones({
+            "pc_id": PC_ID,
+            "pc_nombre": PC_NOMBRE,
+            "sesiones": sesiones,
+        }),
+        marcar_enviadas=marcar_sincronizado,
+        marcar_rechazadas=_marcar_rechazadas,
+    )
+    if resultado.enviadas or resultado.rechazadas:
+        log.info(f"Sincronizadas {resultado.enviadas} sesiones, rechazadas {resultado.rechazadas}")
+    elif resultado.completo:
         log.info("Sin pendientes")
-        return
+    if not resultado.completo:
+        log.warning("Envío de sesiones interrumpido (sin red o límite del servidor) — reintentará")
 
-    sesiones_enriquecidas = []
-    for s in pendientes:
-        sesion = dict(s)
-        if s["carnet"]:
-            est = buscar_estudiante_cache(s["carnet"])
-            if est:
-                sesion["nombre"] = est.get("nombre")
-                sesion["carrera"] = est.get("carrera")
-                sesion["facultad"] = est.get("facultad")
-                sesion["sexo"] = est.get("sexo")
-                sesion["fecha_nacimiento"] = est.get("fecha_nacimiento")
-        sesiones_enriquecidas.append(sesion)
 
-    payload = {
-        "pc_id": PC_ID,
-        "pc_nombre": PC_NOMBRE,
-        "sesiones": sesiones_enriquecidas,
-    }
-    ok = enviar_sesiones(payload)
-    if ok:
-        ids = [s["id"] for s in pendientes]
-        marcar_sincronizado(ids)
-        log.info(f"Sincronizadas {len(ids)} sesiones")
-    else:
-        log.warning("Servidor rechazó el payload — reintentará")
+def _enriquecer(s: dict) -> dict:
+    sesion = dict(s)
+    if s["carnet"]:
+        est = buscar_estudiante_cache(s["carnet"])
+        if est:
+            sesion["nombre"] = est.get("nombre")
+            sesion["carrera"] = est.get("carrera")
+            sesion["facultad"] = est.get("facultad")
+            sesion["sexo"] = est.get("sexo")
+            sesion["fecha_nacimiento"] = est.get("fecha_nacimiento")
+    return sesion
+
+
+def _marcar_rechazadas(ids: list):
+    marcar_rechazada(ids)
+    log.warning(f"El servidor rechazó por datos inválidos las sesiones {ids}; quedan guardadas localmente")
 
 
 def _ciclo_sync():

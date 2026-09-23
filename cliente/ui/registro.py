@@ -166,6 +166,9 @@ class PantallaRegistro(QWidget):
 
         self.nombre = QLineEdit()
         self.nombre.setPlaceholderText("Nombre completo")
+        # Mismo límite que el servidor: un nombre más largo haría que rechace
+        # la sesión al sincronizarla.
+        self.nombre.setMaxLength(255)
         form.addRow("Nombre:", self.nombre)
 
         self.carnet = QLineEdit()

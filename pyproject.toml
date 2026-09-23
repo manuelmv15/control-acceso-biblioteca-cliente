@@ -53,7 +53,7 @@ skips = [
     # una lectura de hardware opcional o el servidor no respondió una
     # consulta puntual (se reintenta en el próximo ciclo de sync).
     "B110",
-    # db/sesiones.py::marcar_sincronizado construye el `IN (...)` repitiendo
+    # db/sesiones.py::_marcar construye el `IN (...)` repitiendo
     # el placeholder `?` una vez por id (`",".join("?" * len(ids))`) — nunca
     # interpola un valor real; los ids viajan parametrizados en la tupla de
     # bind params. Se verificó a mano al agregar este job de SAST.
