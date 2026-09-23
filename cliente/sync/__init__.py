@@ -54,8 +54,9 @@ def _ejecutar_ciclo():
         log.info("Sin conexión — skip")
         return
 
-    _sincronizar_estudiantes_pendientes()
-
+    # El estado va antes que los estudiantes pendientes: el servidor solo
+    # acepta que un kiosko edite la ficha del estudiante con sesión activa en
+    # esa PC, y lo sabe por este heartbeat.
     estado_actual = estado_mod.get_estado()
     enviar_estado({
         "pc_id": PC_ID,
@@ -69,6 +70,8 @@ def _ejecutar_ciclo():
         "sexo": estado_actual["sexo"],
         "fecha_nacimiento": estado_actual["fecha_nacimiento"],
     })
+
+    _sincronizar_estudiantes_pendientes()
 
     pendientes = obtener_pendientes()
     if not pendientes:

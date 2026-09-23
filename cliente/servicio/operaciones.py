@@ -237,8 +237,7 @@ class ServicioKiosko:
             sector = _texto(sector, "sector", obligatorio=True, max_len=100)
 
         with self._lock:
-            if self._cerrar_sesion_activa():
-                self._forzar_sync()
+            self._cerrar_sesion_activa()
             ahora = now_sv()
             self._sesion = {
                 "id": str(uuid.uuid4()),
@@ -254,6 +253,9 @@ class ServicioKiosko:
                 "fecha": date.today().isoformat(),
             })
             self._publicar_estado_sesion(est, sector or "")
+            # Heartbeat inmediato: el servidor rechaza editar los datos del
+            # estudiante hasta que sabe que tiene la sesión abierta en esta PC.
+            self._forzar_sync()
             if carnet:
                 log.info("Sesión iniciada — carnet %s", carnet)
             else:

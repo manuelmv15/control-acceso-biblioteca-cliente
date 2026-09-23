@@ -232,12 +232,22 @@ def test_sesion_de_invitado(db_temporal):
     assert estado["activa"] and estado["carnet"] is None and estado["nombre"] == "Docente"
 
 
+def test_abrir_sesion_fuerza_un_heartbeat(db_temporal):
+    # El servidor solo deja editar los datos del estudiante con sesión activa
+    # en la PC, y se entera por el heartbeat: no puede esperar al intervalo.
+    guardar_estudiante_cache(ESTUDIANTE)
+    syncs = []
+    _servicio(syncs=syncs).abrir_sesion(carnet="AB12345")
+    assert syncs
+
+
 def test_cerrar_sesion_registra_hora_fin_y_sincroniza(db_temporal):
     guardar_estudiante_cache(ESTUDIANTE)
     syncs = []
     srv = _servicio(syncs=syncs)
     sesion = srv.abrir_sesion(carnet="AB12345")
     assert obtener_pendientes() == []  # en curso: todavía no se sincroniza
+    syncs.clear()
 
     assert srv.cerrar_sesion() == {"cerrada": True}
 
